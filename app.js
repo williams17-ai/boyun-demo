@@ -3,7 +3,9 @@ const $=s=>document.getElementById(s);
 const F=window.Feedback, QN=window.Questions;
 const SUB={zh:["這裡替你記住了","收進這個安靜的地方了","路上又亮了一點"],en:["This place will remember it","Kept safe in the quiet","A little more light along the way"]};
 const STAGES=["霧還很濃","有一點光","路漸漸清楚","風停了","豁然開朗"];
-const CONGRATS=["","霧氣散開了，林間透進第一道光","腳下浮現一條小徑，繼續走吧","樹叢後面，是一整片開闊的天空","柳暗花明又一村——你走出來了"];
+// one line per stage, each a little more open; shown in the language of the latest idea ([0] is the start, never a step up)
+const CONGRATS={zh:["霧還很濃，但你已經開始了","霧散開一點，透進第一道光","路漸漸清楚了","風停了，四周很靜","雲散開了，你看見遠方"],
+  en:["The mist is still thick, but you've begun","The mist thins, and the first light comes through","The way is growing clear","The wind has stilled; all is quiet","The clouds part, and you can see far away"]};
 const TH_REAL=[0,5,15,30,50], TH_TEST=[0,1,2,3,4];
 const STREAK_GAP=180000, SUMMARY_IDLE=20000;
 const K="boyun.v1";
@@ -569,7 +571,7 @@ function transition(from,to){
   if(st.scene!=="reuniverse"){vid.src=`a/t${from+1}${from+2}.mp4`;vid.currentTime=0;vw.classList.add("on");}
   const fin=()=>{if(!vDone)return;vDone=null;clearTimeout(vTimer);shown=to;setBg(to,true);renderTop();syncAudio();
     vw.classList.remove("on");setTimeout(()=>{vid.pause();},500);sfx("sfx_stage_up",.9);
-    busy=false;showCenter(CONGRATS[to],STAGES[to],3200);
+    busy=false;showCenter(CONGRATS[(st.ideas[0]&&st.ideas[0].lang)==="en"?"en":"zh"][to],STAGES[to],3200);
     if(pendingFollow){const pf=pendingFollow;pendingFollow=null;setTimeout(()=>showFollow(pf),3500);}else setTimeout(updateStarter,3500);};
   vDone=fin;vTimer=setTimeout(fin,9000);
   if(st.scene==="reuniverse"){sky.rise(from,to,fin);return;}       // no forest film: we rise through the clouds instead

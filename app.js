@@ -1,8 +1,8 @@
 (()=>{
 const $=s=>document.getElementById(s);
 const F=window.Feedback, QN=window.Questions;
-const SUB={zh:["森林替你記住了","收進你的森林了","林子裡又亮了一點"],en:["The forest will remember this","Kept safe in your forest","A little more light in the woods"]};
-const STAGES=["迷霧叢林","林間微光","小徑初現","豁然開朗","柳暗花明"];
+const SUB={zh:["這裡替你記住了","收進這個安靜的地方了","路上又亮了一點"],en:["This place will remember it","Kept safe in the quiet","A little more light along the way"]};
+const STAGES=["霧還很濃","有一點光","路漸漸清楚","風停了","豁然開朗"];
 const CONGRATS=["","霧氣散開了，林間透進第一道光","腳下浮現一條小徑，繼續走吧","樹叢後面，是一整片開闊的天空","柳暗花明又一村——你走出來了"];
 const TH_REAL=[0,5,15,30,50], TH_TEST=[0,1,2,3,4];
 const STREAK_GAP=180000, SUMMARY_IDLE=20000;
@@ -532,7 +532,7 @@ function chainText(r,md){
 }
 function allText(md){
   const roots=sortedRoots();
-  return (md?"# ":"")+"撥雲見日 · 我的點子\n"+fmtDay(Date.now())+"\n\n"+roots.map(r=>chainText(r,md)).join(md?"\n\n---\n\n":"\n\n———\n\n")+"\n";
+  return (md?"# ":"")+"雲間 · 我的點子\n"+fmtDay(Date.now())+"\n\n"+roots.map(r=>chainText(r,md)).join(md?"\n\n---\n\n":"\n\n———\n\n")+"\n";
 }
 function copyText(t){
   const ok=()=>snack("已複製，可以貼到任何地方");
@@ -548,8 +548,8 @@ function download(name,t){
   const b=new Blob([t],{type:"text/markdown;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");
   a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);snack("已存成檔案");
 }
-$("shareAll").onclick=()=>{if(!st.ideas.length)return snack("還沒有點子可以分享");shareText("撥雲見日",allText(false));};
-$("dlAll").onclick=()=>{if(!st.ideas.length)return snack("還沒有點子可以存");const d=new Date();download(`撥雲見日-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.md`,allText(true));};
+$("shareAll").onclick=()=>{if(!st.ideas.length)return snack("還沒有點子可以分享");shareText("雲間",allText(false));};
+$("dlAll").onclick=()=>{if(!st.ideas.length)return snack("還沒有點子可以存");const d=new Date();download(`雲間-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.md`,allText(true));};
 function removeIdea(x){
   const isRoot=!x.p||!byId(x.p);
   const msg=isRoot?"確定刪掉這個點子，和後面接著想的內容嗎？":"確定刪掉這段嗎？後面接著寫的也會一起刪掉。";
@@ -594,7 +594,7 @@ function renderList(){
     const acts=document.createElement("div");acts.className="acts";
     const mk=(txt,fn,cls)=>{const b=document.createElement("button");b.textContent=txt;if(cls)b.className=cls;b.onclick=fn;acts.appendChild(b);};
     if(!depth){mk(x.pin?"取消置頂":"置頂",()=>{x.pin=!x.pin;persist();renderList();});
-               mk("分享",()=>shareText("撥雲見日",chainText(x,false)));}
+               mk("分享",()=>shareText("雲間",chainText(x,false)));}
     mk("刪除",()=>removeIdea(x),"del");
     d.appendChild(acts);
     mo.onclick=()=>acts.classList.toggle("on");

@@ -6,13 +6,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="撥雲見日">
+<meta name="apple-mobile-web-app-title" content="雲間">
 <meta name="theme-color" content="#0b1410">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
 <link rel="preload" as="image" href="a/s1.jpg">
-<title>撥雲見日</title>
+<title>雲間</title>
 <style>
 :root{--glass:rgba(255,255,255,.12);--line:rgba(255,255,255,.22);--txt:#f4f7f2;--soft:rgba(244,247,242,.7);--gold:#ffe9b0}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -227,7 +227,7 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
     <div class="dots" id="dots"></div>
     <div style="display:flex;gap:8px">
       <button class="icon" id="btnRain" aria-label="天氣"><svg viewBox="0 0 24 24"><path d="M7 15a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 8a3.5 3.5 0 0 1 .5 7H7z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/></svg></button>
-      <button class="icon" id="btnSound" aria-label="森林的聲音"><svg viewBox="0 0 24 24" id="sndIcon"></svg></button>
+      <button class="icon" id="btnSound" aria-label="這裡的聲音"><svg viewBox="0 0 24 24" id="sndIcon"></svg></button>
       <button class="icon" id="btnSet" aria-label="設定"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>
     </div>
   </div>
@@ -264,10 +264,10 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   <div class="wfol"></div>
   <div class="wshade"></div>
   <div class="wcontent">
-    <h1>撥雲見日</h1>
+    <h1>雲間</h1>
     <p class="wline">有些念頭，說出來就清楚了</p>
-    <p class="wsub">陪你往前走</p>
-    <button id="wGo" class="wgo">走進森林</button>
+    <p class="wsub">念頭累積，雲就散開</p>
+    <button id="wGo" class="wgo">走進寧靜</button>
   </div>
 </div>
 <div id="onb" class="ov">
@@ -282,11 +282,11 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
     </div>
   </section>
   <section class="ostep" data-step="1">
-    <h2>想待在哪片風景？</h2>
+    <h2>想待在哪一種安靜裡？</h2>
     <div class="ocards two three">
-      <button class="ocard pic" data-k="scene" data-v="mist"><i style="background-image:url(a/s1.jpg)"></i><b>迷霧森林</b></button>
-      <button class="ocard pic" data-k="scene" data-v="rain"><i class="rainy" style="background-image:url(a/s2.jpg)"></i><b>雨中森林</b></button>
-      <button class="ocard pic" data-k="scene" data-v="snow"><i class="snowy" style="background-image:url(a/s1.jpg)"></i><b>雪落無聲</b></button>
+      <button class="ocard pic" data-k="scene" data-v="mist"><i style="background-image:url(a/s1.jpg)"></i><b>霧起時</b></button>
+      <button class="ocard pic" data-k="scene" data-v="rain"><i class="rainy" style="background-image:url(a/s2.jpg)"></i><b>雨落時</b></button>
+      <button class="ocard pic" data-k="scene" data-v="snow"><i class="snowy" style="background-image:url(a/s1.jpg)"></i><b>雪落時</b></button>
     </div>
   </section>
   <section class="ostep" data-step="2">
@@ -306,7 +306,7 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
 </div>
 <div class="sheet" id="setSheet"><div class="grab"></div><h3>設定</h3>
   <div class="sgroup"><div class="slabel">今天想寫點什麼</div><div class="seg"><button data-set="intent" data-v="idea">想點子</button><button data-set="intent" data-v="mood">整理心情</button><button data-set="intent" data-v="free">隨便寫寫</button></div></div>
-  <div class="sgroup"><div class="slabel">風景</div><div class="seg"><button data-set="scene" data-v="mist">迷霧森林</button><button data-set="scene" data-v="rain">雨中森林</button><button data-set="scene" data-v="snow">雪落無聲</button></div></div>
+  <div class="sgroup"><div class="slabel">風景</div><div class="seg"><button data-set="scene" data-v="mist">霧起時</button><button data-set="scene" data-v="rain">雨落時</button><button data-set="scene" data-v="snow">雪落時</button></div></div>
   <div class="sgroup"><div class="slabel">聲音</div><div class="seg wrap"><button data-set="sound" data-v="rain">細雨</button><button data-set="sound" data-v="stream">溪邊</button><button data-set="sound" data-v="bowl">頌缽</button><button data-set="sound" data-v="forest">林間蟲鳴</button><button data-set="sound" data-v="snow">雪</button><button data-set="sound" data-v="quiet">安靜</button></div></div>
   <div class="opt"><div>遠方的低吟<small>很輕的底音，墊在聲音下面</small></div><button class="sw" id="swPad"></button></div>
   <div class="opt"><div>寫完後陪我多想一點<small>輕輕問你一句，想停隨時可以停</small></div><button class="sw" id="swFollow"></button></div>
@@ -314,9 +314,9 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   <div style="font-size:13px;color:var(--soft);margin-top:12px">看看每一段路</div>
   <div class="chips" id="chips"></div>
   <div class="opt"><div>把寫下的整理成檔案<small>可以放進備忘錄、Notion 或電腦裡</small></div><button class="chip" id="dlAll">存成檔案</button></div>
-  <div class="opt"><div>重新走進森林<small>再看一次一開始的那片風景</small></div><button class="chip" id="reWelcome">走一次</button></div>
+  <div class="opt"><div>重新走一次<small>再看一次一開始的那片風景</small></div><button class="chip" id="reWelcome">走一次</button></div>
   <div class="opt"><div class="danger">清除所有點子並重來</div><button class="chip danger" id="reset">重設</button></div>
-  <div class="ver">撥雲見日 · 你寫下的一切，只留在這支手機裡</div><!-- build v0.7 -->
+  <div class="ver">雲間 · 你寫下的一切，只留在這支手機裡</div><!-- build v0.7 -->
 </div>
 
 <script src="feedback.js"></script>

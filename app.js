@@ -33,8 +33,8 @@ function migrate(s){
   }
   s.bonus=s.bonus|0; s.follow=s.follow!==false;
   s.test=!!s.test; s.pad=s.pad!==false; s.onboarded=!!s.onboarded; s.muted=!!s.muted;
-  if(!["mist","rain"].includes(s.scene))s.scene="mist";
-  if(!["rain","stream","bowl","forest","quiet"].includes(s.sound))s.sound="rain";
+  if(!["mist","rain","snow"].includes(s.scene))s.scene="mist";
+  if(!["rain","stream","bowl","forest","snow","quiet"].includes(s.sound))s.sound="rain";
   if(!["idea","mood","free"].includes(s.intent))s.intent="free";
   return s;
 }
@@ -76,7 +76,7 @@ const AC=window.AudioContext||window.webkitAudioContext;
 function setSession(){try{const a=navigator.audioSession;if(a&&a.type!=="playback")a.type="playback";}catch(e){}}
 // loops are loudness-matched (-23 LUFS) in a/v4 — see sfx/synth_v4.py
 const SRC={rain_soft:"v5/rain_drizzle",stream:"v4/stream",bowl_ambient:"v4/bowl_ambient",pad_ethereal:"v4/pad_ethereal",
-  insects_mist:"v4/insects_mist",insects_meadow:"v4/insects_meadow",sfx_save_tone:"v4/sfx_save_tone"};
+  insects_mist:"v4/insects_mist",snow_hush:"v5/snow_hush",insects_meadow:"v4/insects_meadow",sfx_save_tone:"v4/sfx_save_tone"};
 // one low-pass over every loop, opening up as the mist clears (Hz per scenery stage; mirrors synth_v4.py)
 const CUTOFF=[1000,1935,3740,7240,14000];
 // make-up gain (dB) for loops with a lot of top end, so opening the filter brightens rather than just gets louder
@@ -147,7 +147,7 @@ function checkHeard(){
     if(silent||(isIOS&&!navigator.audioSession)){st.heardHint=true;persist();showToast("聽不到聲音嗎？","看看手機側邊的靜音鍵，或把音量調大一點");}
   },1800);
 }
-const BEDS={rain:"rain_soft",stream:"stream",bowl:"bowl_ambient"};
+const BEDS={rain:"rain_soft",stream:"stream",bowl:"bowl_ambient",snow:"snow_hush"};
 const bedVol=(name,base)=>base*Math.pow(10,((LP_COMP[name]||[])[shown]||0)/20);
 function soundOn(){return !st.muted&&st.sound!=="quiet";}
 function syncAudio(){
@@ -159,7 +159,7 @@ function syncAudio(){
     setLoop("insects_meadow",on&&st.sound==="forest"&&shown>2?bedVol("insects_meadow",1):0,3);
     setLoop("pad_ethereal",on&&st.pad?.4:0,4);
   }
-  $("btnSound").classList.toggle("on",on);$("btnRain").classList.toggle("on",st.scene==="rain");
+  $("btnSound").classList.toggle("on",on);$("btnRain").classList.toggle("on",st.scene!=="mist");
   $("sndIcon").innerHTML=on?'<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/>':'<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/>';
   document.querySelectorAll("[data-set]").forEach(b=>b.classList.toggle("sel",st[b.dataset.set]===b.dataset.v));
   $("swPad").classList.toggle("on",st.pad);$("swTest").classList.toggle("on",st.test);$("swFollow").classList.toggle("on",st.follow);
@@ -236,8 +236,46 @@ addEventListener("resize",()=>{if(W){sizeFx();}});
 window.__audio=()=>Object.keys(tracks);window.__lp=()=>lp?Math.round(lp.frequency.value):null;
 window.__fx={get running(){return !!rafId},get drops(){return drops.length},get beads(){return beads.length}};
 
-function setScene(v){st.scene=v;persist();unlock();setRainFx(v==="rain");syncAudio();}
-$("btnRain").onclick=()=>setScene(st.scene==="rain"?"mist":"rain");
+// ---------- snow visuals (sparse, slow, with depth: near = big, fast, soft; far = small, slow) ----------
+const sc=$("snowCv"),sx=sc.getContext("2d");
+let flakes=[],snowRaf=0,snowVisible=false,snowT=0,SW=0,SH=0,snowStop;
+const flakeSpr=[0,1,2].map(k=>{const c=document.createElement("canvas");c.width=c.height=64;const g=c.getContext("2d");
+  const r=g.createRadialGradient(32,32,0,32,32,32),core=[.55,.35,.15][k];   // sharp far flakes, blurry near ones
+  r.addColorStop(0,"rgba(255,255,255,.95)");r.addColorStop(core,"rgba(250,252,255,.8)");r.addColorStop(Math.min(.98,core+.35),"rgba(235,242,250,.18)");r.addColorStop(1,"rgba(235,242,250,0)");
+  g.fillStyle=r;g.fillRect(0,0,64,64);return c;});
+function newFlake(any){const z=Math.pow(Math.random(),1.8);    // most flakes far away
+  return{z,x:Math.random()*SW,y:any?Math.random()*SH:-20-Math.random()*60,r:1+z*5.5,v:14+z*58,a:.45+z*.4,
+    ph:Math.random()*6.28,sw:.25+Math.random()*.5,amp:6+z*22,spr:z<.35?0:z<.7?1:2};}
+function sizeSnow(){
+  const d=Math.min(devicePixelRatio||1,2);SW=innerWidth;SH=innerHeight;sc.width=SW*d;sc.height=SH*d;sx.setTransform(d,0,0,d,0,0);
+  let n=Math.min(90,Math.round(SW*SH/5200));if(reduceMotion)n=Math.round(n/3);
+  flakes=Array.from({length:n},()=>newFlake(true));drawSnow(0);
+}
+function drawSnow(dt){
+  sx.clearRect(0,0,SW,SH);
+  for(const f of flakes){
+    if(dt){f.ph+=dt*f.sw;f.y+=f.v*dt;if(f.y>SH+20)Object.assign(f,newFlake(false));}
+    const x=f.x+Math.sin(f.ph)*f.amp,s=f.r*2*(1+f.spr*.35);
+    sx.globalAlpha=f.a;sx.drawImage(flakeSpr[f.spr],x-s/2,f.y-s/2,s,s);
+  }
+  sx.globalAlpha=1;
+}
+function snowFrame(t){const dt=Math.min(.05,(t-(snowT||t))/1000);snowT=t;drawSnow(dt);
+  if(snowVisible)snowRaf=requestAnimationFrame(snowFrame);else snowRaf=0;}
+function setSnowFx(on,instant){
+  clearTimeout(snowStop);
+  if(on){
+    if(!SW)sizeSnow();
+    if(instant){const els=[sc,...document.querySelectorAll(".bg,.snowveil")];for(const c of els)c.style.transition="none";requestAnimationFrame(()=>requestAnimationFrame(()=>{for(const c of els)c.style.transition="";}));}
+    app.classList.add("snowing");snowVisible=true;
+    if(reduceMotion)drawSnow(0);else if(!snowRaf){snowT=0;snowRaf=requestAnimationFrame(snowFrame);}
+  }else{app.classList.remove("snowing");snowStop=setTimeout(()=>{snowVisible=false;},2600);}
+}
+addEventListener("resize",()=>{if(SW)sizeSnow();});
+window.__snow={get running(){return !!snowRaf},get flakes(){return flakes.length},get y(){return flakes.slice(0,5).map(f=>Math.round(f.y))}};
+
+function setScene(v){st.scene=v;if(v!=="mist")st.lastWeather=v;persist();unlock();setRainFx(v==="rain");setSnowFx(v==="snow");syncAudio();}
+$("btnRain").onclick=()=>setScene(st.scene!=="mist"?"mist":(st.lastWeather==="snow"?"snow":"rain"));
 $("btnSound").onclick=()=>{unlock();if(st.sound==="quiet"){st.sound=st.lastSound||"rain";st.muted=false;}else st.muted=!st.muted;persist();syncAudio();checkHeard();};
 function setSound(v){unlock();if(v!=="quiet")st.lastSound=v;st.sound=v;st.muted=false;persist();syncAudio();checkHeard();}
 document.querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>{const k=b.dataset.set,v=b.dataset.v;
@@ -247,6 +285,7 @@ $("swFollow").onclick=()=>{st.follow=!st.follow;persist();syncAudio();if(!st.fol
 $("swTest").onclick=()=>{st.test=!st.test;persist();shown=stageOf(total());setBg(shown);renderTop();syncAudio();};
 syncAudio();
 if(st.scene==="rain")setRainFx(true,true);
+if(st.scene==="snow")setSnowFx(true,true);
 
 // ---------- input ----------
 const ta=$("ta"),save=$("save");let lastInput=0;
@@ -597,14 +636,19 @@ document.querySelectorAll(".ocard").forEach(c=>c.onclick=()=>{
   document.querySelectorAll(`.ocard[data-k="${k}"]`).forEach(x=>x.classList.toggle("sel",x===c));
   oPicked[k]=v;
   if(k==="intent"){st.intent=v;persist();setTimeout(()=>goStep(1),550);}
-  else if(k==="scene"){setScene(v);setTimeout(()=>goStep(2),650);}
+  else if(k==="scene"){setScene(v);setTimeout(()=>{goStep(2);presetSound(v);},650);}
   else if(k==="sound"){setSound(v);$("oNext").classList.add("show");}   // live preview with a soft fade-in
 });
+// the sound step starts on the sound that belongs to the chosen scenery (still free to change)
+function presetSound(scene){
+  if(oPicked.sound)return;const v=scene==="snow"?"snow":scene==="rain"?"rain":null;if(!v)return;
+  const c=document.querySelector(`.ocard[data-k="sound"][data-v="${v}"]`);if(c)c.click();
+}
 $("oNext").onclick=finishOnb;
 $("oSkip").onclick=()=>{
   if(oStep===0){if(!oPicked.intent){st.intent="free";persist();}goStep(1);}
-  else if(oStep===1){if(!oPicked.scene)setScene("mist");goStep(2);}
-  else{if(!oPicked.sound)setSound("rain");finishOnb();}
+  else if(oStep===1){if(!oPicked.scene)setScene("mist");goStep(2);presetSound(st.scene);}
+  else{if(!oPicked.sound)setSound(st.scene==="snow"?"snow":"rain");finishOnb();}
 };
 function finishOnb(){
   st.onboarded=true;persist();syncAudio();setTimeout(checkHeard,2600);

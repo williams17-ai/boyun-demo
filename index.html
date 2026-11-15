@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="撥雲見日">
+<meta name="theme-color" content="#0b1410">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="preload" as="image" href="a/s1.jpg">
+<title>撥雲見日</title>
+<style>
+:root{--glass:rgba(255,255,255,.12);--line:rgba(255,255,255,.22);--txt:#f4f7f2;--soft:rgba(244,247,242,.7);--gold:#ffe9b0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#0b1410;color:var(--txt);font-family:-apple-system,"PingFang TC","Noto Sans TC","Heiti TC",sans-serif;overflow:hidden;overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+#app{position:fixed;inset:0}
+.bg{position:absolute;inset:-4%;background-size:cover;background-position:center;opacity:0;transition:opacity 1.6s ease;animation:drift 40s ease-in-out infinite alternate;will-change:transform,opacity}
+.bg.on{opacity:1}
+@keyframes drift{from{transform:scale(1.02) translate3d(0,0,0)}to{transform:scale(1.1) translate3d(-1.5%,-1%,0)}}
+.shade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.35),rgba(0,0,0,0) 22%,rgba(0,0,0,0) 50%,rgba(0,0,0,.55));pointer-events:none}
+.mist{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 30% 70%,rgba(255,255,255,.12),transparent 60%),radial-gradient(ellipse at 75% 40%,rgba(255,255,255,.08),transparent 55%);animation:mist 18s ease-in-out infinite alternate;transition:opacity 2s}
+@keyframes mist{from{transform:translateX(-4%)}to{transform:translateX(4%)}}
+/* top bar */
+.top{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 10px) 14px 0;display:flex;align-items:center;justify-content:space-between;z-index:5}
+.icon{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:rgba(0,0,0,.18);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:.75;font-size:18px}
+.icon:active{transform:scale(.92)}
+.icon svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.dots{display:flex;gap:9px;align-items:center}
+.dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.3);transition:all .6s}
+.dot.done{background:rgba(255,255,255,.85)}
+.dot.cur{width:9px;height:9px;background:var(--gold);box-shadow:0 0 10px var(--gold)}
+.stage-name{position:absolute;top:calc(env(safe-area-inset-top) + 56px);left:0;right:0;text-align:center;font-size:13px;letter-spacing:.3em;color:var(--soft);z-index:4;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.count{display:block;margin-top:4px;font-size:11px;letter-spacing:.15em;opacity:.8}
+/* input */
+.composer{position:absolute;left:14px;right:14px;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:5;transition:transform .5s cubic-bezier(.2,.8,.2,1),opacity .5s}
+.card{background:var(--glass);border:1px solid var(--line);border-radius:24px;backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);padding:14px 14px 10px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+textarea{width:100%;min-height:96px;max-height:40vh;resize:none;border:0;outline:0;background:transparent;color:var(--txt);font-size:18px;line-height:1.6;font-family:inherit}
+textarea::placeholder{color:rgba(255,255,255,.6)}
+.row{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+.hint{font-size:12px;color:var(--soft);letter-spacing:.08em}
+.btns{display:flex;gap:8px}
+.mic,.save{width:44px;height:44px;border-radius:50%;display:grid;place-items:center}
+.mic{background:rgba(255,255,255,.12)}
+.mic.rec{background:rgba(255,120,120,.45);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 8px rgba(255,120,120,.15)}}
+.save{background:rgba(255,233,176,.9);color:#2a2414}
+.save:disabled{opacity:.35}
+.mic svg,.save svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.composer.sent{transform:translateY(-30px);opacity:0}
+/* orb */
+.orb{position:fixed;width:18px;height:18px;border-radius:50%;z-index:6;pointer-events:none;background:radial-gradient(circle,#fff 0,#fff6d6 35%,rgba(255,226,140,.5) 60%,transparent 72%);box-shadow:0 0 30px 12px rgba(255,230,160,.55),0 0 80px 30px rgba(255,230,160,.25)}
+/* praise */
+.praise{position:absolute;left:24px;right:24px;top:38%;text-align:center;z-index:6;font-size:22px;line-height:1.6;letter-spacing:.06em;text-shadow:0 2px 14px rgba(0,0,0,.6);opacity:0;transform:translateY(10px);transition:opacity .7s,transform .7s;pointer-events:none}
+.praise.show{opacity:1;transform:none}
+.praise small{display:block;font-size:13px;color:var(--soft);margin-top:10px;letter-spacing:.2em}
+/* video overlay */
+#vwrap{position:fixed;inset:0;z-index:20;background:#000;opacity:0;pointer-events:none;transition:opacity .5s}
+#vwrap.on{opacity:1;pointer-events:auto}
+#vwrap video{width:100%;height:100%;object-fit:cover}
+#skip{position:absolute;right:16px;bottom:calc(env(safe-area-inset-bottom) + 20px);font-size:13px;color:rgba(255,255,255,.7);padding:8px 14px;border-radius:20px;background:rgba(0,0,0,.3)}
+/* sheets */
+.veil{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .35s}
+.veil.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;max-height:78vh;overflow:auto;background:rgba(18,26,22,.82);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);border-radius:22px 22px 0 0;padding:10px 18px calc(env(safe-area-inset-bottom) + 20px);transform:translateY(105%);transition:transform .4s cubic-bezier(.2,.8,.2,1)}
+.sheet.on{transform:none}
+.grab{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.3);margin:4px auto 14px}
+.sheet h3{margin:0 0 12px;font-size:16px;font-weight:600;letter-spacing:.1em}
+.item{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:15px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.item time{display:block;font-size:11px;color:var(--soft);margin-bottom:3px}
+.empty{color:var(--soft);font-size:14px;padding:20px 0;text-align:center}
+.opt{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:15px}
+.opt small{display:block;color:var(--soft);font-size:12px;margin-top:2px}
+.sw{width:50px;height:30px;border-radius:15px;background:rgba(255,255,255,.2);position:relative;transition:background .3s;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .3s}
+.sw.on{background:#c9a94f}.sw.on::after{transform:translateX(20px)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0}
+.chip{padding:8px 12px;border-radius:16px;background:rgba(255,255,255,.12);font-size:13px}
+.danger{color:#ff9c9c}
+.ver{font-size:11px;color:var(--soft);text-align:center;margin-top:14px}
+.badge{position:absolute;top:calc(env(safe-area-inset-top) + 54px);right:14px;font-size:10px;padding:3px 8px;border-radius:10px;background:rgba(201,169,79,.8);color:#1d1a0f;z-index:5;display:none}
+.badge.on{display:block}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="bg" id="bgA"></div><div class="bg" id="bgB"></div>
+  <div class="mist" id="mist"></div>
+  <div class="shade"></div>
+
+  <div class="top">
+    <button class="icon" id="btnList" aria-label="點子清單"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></svg></button>
+    <div class="dots" id="dots"></div>
+    <div style="display:flex;gap:8px">
+      <button class="icon" id="btnSound" aria-label="環境音"><svg viewBox="0 0 24 24" id="sndIcon"></svg></button>
+      <button class="icon" id="btnSet" aria-label="設定"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>
+    </div>
+  </div>
+  <div class="badge" id="badge">測試模式</div>
+  <div class="stage-name" id="stageName"></div>
+
+  <div class="praise" id="praise"></div>
+
+  <div class="composer" id="composer">
+    <div class="card" id="card">
+      <textarea id="ta" placeholder="有什麼點子冒出來了？" autofocus enterkeyhint="done"></textarea>
+      <div class="row">
+        <span class="hint" id="hint">寫完往上滑，或點 ↑ 收下</span>
+        <div class="btns">
+          <button class="mic" id="mic" aria-label="語音輸入" hidden><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+          <button class="save" id="save" aria-label="收下點子" disabled><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="vwrap"><video id="vid" muted playsinline webkit-playsinline preload="auto"></video><button id="skip">略過 ›</button></div>
+
+<div class="veil" id="veil"></div>
+<div class="sheet" id="listSheet"><div class="grab"></div><h3>我的點子</h3><div id="list"></div></div>
+<div class="sheet" id="setSheet"><div class="grab"></div><h3>設定</h3>
+  <div class="opt"><div>森林環境音<small>第 1–3 階段叢林、4–5 階段草原</small></div><button class="sw" id="swAmb"></button></div>
+  <div class="opt"><div>淋浴冥想音<small>雨聲般的淋浴白噪音</small></div><button class="sw" id="swShower"></button></div>
+  <div class="opt"><div>測試模式<small>門檻改成 1／2／3／4 個點子，快速看完 5 個階段</small></div><button class="sw" id="swTest"></button></div>
+  <div style="font-size:13px;color:var(--soft);margin-top:12px">直接預覽轉場</div>
+  <div class="chips" id="chips"></div>
+  <div class="opt"><div class="danger">清除所有點子並重來</div><button class="chip danger" id="reset">重設</button></div>
+  <div class="ver">撥雲見日 · Demo v0.1 · 資料只存在這支手機</div>
+</div>
+
+<script>
+(()=>{
+const $=s=>document.getElementById(s);
+const PRAISE=[
+"這個點子有光，你看見了嗎？","你又往前走了一步，真的很棒","能把念頭寫下來的人，就已經贏了一半",
+"這想法好有你的味道","別小看它，大事都是從一句話開始的","你的腦袋今天很亮喔",
+"收到！這顆種子我幫你好好收著","願意記錄的你，正在替未來的自己鋪路","霧又散了一點點",
+"好點子不怕小，怕的是沒寫下來——你寫了","你對生活的觀察力真的很細膩","這一句，值得被記住",
+"今天的你，比昨天多了一個可能","靈感來找你，因為你一直都準備好了","這個角度好新鮮！",
+"寫下來的那一刻，你就是創作者","你的好奇心是最珍貴的天賦","慢慢來，每一個點子都算數",
+"這想法讓人忍不住想看到後續","你很會把模糊的東西變清楚","給自己一個掌聲，你值得",
+"前面的路，正因為你而變亮","這不是隨便想想，這是火花","你一直在成長，這裡都看得見",
+"點子越來越多，森林越來越透光","你的想像力很自由，好喜歡","這一步很輕，但走得很穩",
+"相信這個念頭，它會帶你去某個地方","你今天也有好好聽見自己的聲音","撥開一片雲，陽光就多一寸"];
+const SUB=["— 誇誇團 —","收進你的森林了","＋1 道光"];
+const STAGES=["迷霧叢林","林間微光","小徑初現","豁然開朗","柳暗花明"];
+const CONGRATS=["","霧氣散開了，林間透進第一道光","腳下浮現一條小徑，繼續走吧","樹叢後面，是一整片開闊的天空","柳暗花明又一村——你走出來了"];
+const TH_REAL=[0,5,15,30,50], TH_TEST=[0,1,2,3,4];
+const K="boyun.v1";
+let st=JSON.parse(localStorage.getItem(K)||"null")||{ideas:[],test:false,amb:false,shower:false};
+const persist=()=>localStorage.setItem(K,JSON.stringify(st));
+const th=()=>st.test?TH_TEST:TH_REAL;
+const stageOf=n=>{const t=th();let s=0;for(let i=0;i<5;i++)if(n>=t[i])s=i;return s;};
+let shown=stageOf(st.ideas.length);
+
+// preload images
+for(let i=1;i<=5;i++){const im=new Image();im.src=`a/s${i}.jpg`;}
+
+// background crossfade
+let front=$("bgA"),back=$("bgB");
+function setBg(s,instant){
+  back.style.backgroundImage=`url(a/s${s+1}.jpg)`;
+  if(instant){back.style.transition="none";front.style.transition="none";}
+  back.classList.add("on");front.classList.remove("on");
+  [front,back]=[back,front];
+  if(instant)requestAnimationFrame(()=>{front.style.transition="";back.style.transition="";});
+  $("mist").style.opacity=String(1-s*0.22);
+}
+function renderTop(){
+  const d=$("dots");d.innerHTML="";
+  for(let i=0;i<5;i++){const e=document.createElement("span");e.className="dot"+(i<shown?" done":"")+(i===shown?" cur":"");d.appendChild(e);}
+  const n=st.ideas.length,t=th(),next=t[shown+1];
+  $("stageName").innerHTML=`${STAGES[shown]}<span class="count">${n} 個點子${next!==undefined&&stageOf(n)===shown?` · 再 ${next-n} 個看見新風景`:""}</span>`;
+  $("badge").classList.toggle("on",st.test);
+}
+setBg(shown,true);renderTop();
+
+// audio
+const mk=(src,loop,vol)=>{const a=new Audio(src);a.loop=!!loop;a.preload="auto";a.volume=vol??1;return a;};
+const sfxSave=mk("a/sfx_idea_saved.mp3",0,.8),sfxUp=mk("a/sfx_stage_up.mp3",0,.9);
+const ambJ=mk("a/ambience_misty_jungle.mp3",1,.5),ambM=mk("a/ambience_meadow.mp3",1,.5),shower=mk("a/shower_rain_meditation.mp3",1,.6);
+let unlocked=false;
+function unlock(){if(unlocked)return;unlocked=true;[sfxSave,sfxUp].forEach(a=>{a.muted=true;a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false;}).catch(()=>{a.muted=false;});});syncAmb();}
+document.addEventListener("touchstart",unlock,{once:true,passive:true});document.addEventListener("click",unlock,{once:true});
+const play=a=>{try{a.currentTime=0;a.play().catch(()=>{});}catch(e){}};
+function syncAmb(){
+  const want=st.amb?(shown<=2?ambJ:ambM):null;
+  [ambJ,ambM].forEach(a=>{if(a!==want&&!a.paused)a.pause();});
+  if(want&&want.paused)want.play().catch(()=>{});
+  if(st.shower){if(shower.paused)shower.play().catch(()=>{});}else shower.pause();
+  $("sndIcon").innerHTML=(st.amb||st.shower)?'<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/>':'<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/>';
+  $("swAmb").classList.toggle("on",st.amb);$("swShower").classList.toggle("on",st.shower);$("swTest").classList.toggle("on",st.test);
+}
+syncAmb();
+$("btnSound").onclick=()=>{unlock();const on=st.amb||st.shower;st.amb=!on;if(on)st.shower=false;persist();syncAmb();};
+$("swAmb").onclick=()=>{st.amb=!st.amb;persist();syncAmb();};
+$("swShower").onclick=()=>{st.shower=!st.shower;persist();syncAmb();};
+$("swTest").onclick=()=>{st.test=!st.test;persist();shown=stageOf(st.ideas.length);setBg(shown);renderTop();syncAmb();};
+
+// input
+const ta=$("ta"),save=$("save");
+const fit=()=>{ta.style.height="auto";ta.style.height=Math.min(ta.scrollHeight,innerHeight*.4)+"px";save.disabled=!ta.value.trim();};
+ta.addEventListener("input",fit);
+setTimeout(()=>ta.focus(),300);
+save.onclick=commit;
+// swipe up to save
+let sy=null;
+$("card").addEventListener("touchstart",e=>{sy=e.touches[0].clientY;},{passive:true});
+$("card").addEventListener("touchmove",e=>{if(sy===null||!ta.value.trim())return;const dy=sy-e.touches[0].clientY;if(dy>0)$("composer").style.transform=`translateY(${-Math.min(dy,80)*.5}px)`;},{passive:true});
+$("card").addEventListener("touchend",e=>{if(sy===null)return;const dy=sy-e.changedTouches[0].clientY;$("composer").style.transform="";sy=null;if(dy>70&&ta.value.trim())commit();});
+
+let busy=false,praiseT;
+function commit(){
+  const text=ta.value.trim();if(!text||busy)return;
+  unlock();
+  const before=stageOf(st.ideas.length);
+  st.ideas.unshift({t:text,at:Date.now()});persist();
+  const after=stageOf(st.ideas.length);
+  ta.value="";fit();ta.blur();
+  // orb
+  const r=$("card").getBoundingClientRect();
+  const o=document.createElement("div");o.className="orb";o.style.left=(r.left+r.width/2-9)+"px";o.style.top=(r.top+30)+"px";document.body.appendChild(o);
+  const dx=(Math.random()-.5)*120,ty=-(r.top+30-innerHeight*.22);
+  o.animate([{transform:"translate(0,0) scale(.6)",opacity:0},{transform:"translate(0,-20px) scale(1.4)",opacity:1,offset:.15},{transform:`translate(${dx}px,${ty}px) scale(.5)`,opacity:0}],{duration:2200,easing:"cubic-bezier(.3,.6,.3,1)"}).onfinish=()=>o.remove();
+  play(sfxSave);
+  const c=$("composer");c.classList.add("sent");setTimeout(()=>c.classList.remove("sent"),650);
+  if(after>before){busy=true;setTimeout(()=>{showPraise(true);setTimeout(()=>transition(after-1,after),1500);},500);}
+  else{showPraise();}
+}
+function showPraise(short){
+  const p=$("praise");clearTimeout(praiseT);
+  p.innerHTML=PRAISE[Math.floor(Math.random()*PRAISE.length)]+`<small>${SUB[Math.floor(Math.random()*SUB.length)]}</small>`;
+  requestAnimationFrame(()=>p.classList.add("show"));
+  praiseT=setTimeout(()=>p.classList.remove("show"),short?1300:2400);
+  renderTop();
+}
+// transitions
+const vw=$("vwrap"),vid=$("vid");let vDone=null,vTimer;
+function transition(from,to){
+  busy=true;vid.src=`a/t${from+1}${from+2}.mp4`;vid.currentTime=0;
+  vw.classList.add("on");
+  const fin=()=>{if(!vDone)return;vDone=null;clearTimeout(vTimer);shown=to;setBg(to,true);renderTop();syncAmb();
+    vw.classList.remove("on");setTimeout(()=>{vid.pause();},500);play(sfxUp);
+    const p=$("praise");p.innerHTML=`${CONGRATS[to]}<small>第 ${to+1} 階段 · ${STAGES[to]}</small>`;p.classList.add("show");
+    clearTimeout(praiseT);praiseT=setTimeout(()=>{p.classList.remove("show");busy=false;},3200);};
+  vDone=fin;vid.onended=fin;vTimer=setTimeout(fin,9000);
+  const pr=vid.play();if(pr)pr.catch(()=>setTimeout(fin,600));
+}
+$("skip").onclick=()=>vDone&&vDone();
+
+// mic
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){const mic=$("mic");mic.hidden=false;let rec=null;
+  mic.onclick=()=>{unlock();if(rec){rec.stop();return;}
+    rec=new SR();rec.lang="zh-TW";rec.interimResults=true;rec.continuous=false;const base=ta.value;
+    rec.onresult=e=>{let s="";for(const r of e.results)s+=r[0].transcript;ta.value=(base?base+" ":"")+s;fit();};
+    rec.onend=rec.onerror=()=>{mic.classList.remove("rec");rec=null;};
+    mic.classList.add("rec");try{rec.start();}catch(e){mic.classList.remove("rec");rec=null;}};}
+
+// sheets
+const veil=$("veil");let openS=null;
+function open(s){openS=s;veil.classList.add("on");s.classList.add("on");}
+function close(){if(openS)openS.classList.remove("on");veil.classList.remove("on");openS=null;}
+veil.onclick=close;
+document.querySelectorAll(".sheet").forEach(s=>{let y0=null;s.addEventListener("touchstart",e=>{if(s.scrollTop<=0)y0=e.touches[0].clientY;},{passive:true});s.addEventListener("touchend",e=>{if(y0!==null&&e.changedTouches[0].clientY-y0>80)close();y0=null;});});
+$("btnList").onclick=()=>{const L=$("list");L.innerHTML=st.ideas.length?"":'<div class="empty">還沒有點子，寫下第一個吧</div>';
+  st.ideas.forEach(i=>{const d=document.createElement("div");d.className="item";const dt=new Date(i.at);d.innerHTML=`<time>${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}</time>`;d.appendChild(document.createTextNode(i.t));L.appendChild(d);});open($("listSheet"));};
+$("btnSet").onclick=()=>{syncAmb();open($("setSheet"));};
+const chips=$("chips");for(let i=0;i<4;i++){const b=document.createElement("button");b.className="chip";b.textContent=`▶ ${i+1}→${i+2}`;b.onclick=()=>{unlock();close();setBg(i,true);shown=i;renderTop();setTimeout(()=>transition(i,i+1),400);};chips.appendChild(b);}
+const back0=document.createElement("button");back0.className="chip";back0.textContent="回到目前進度";back0.onclick=()=>{shown=stageOf(st.ideas.length);setBg(shown);renderTop();syncAmb();close();};chips.appendChild(back0);
+$("reset").onclick=()=>{if(!confirm("確定要清除所有點子嗎？"))return;st.ideas=[];persist();shown=0;setBg(0);renderTop();syncAmb();close();};
+})();
+</script>
+</body>
+</html>

@@ -33,8 +33,8 @@ function migrate(s){
   }
   s.bonus=s.bonus|0; s.follow=s.follow!==false;
   s.test=!!s.test; s.pad=s.pad!==false; s.onboarded=!!s.onboarded; s.muted=!!s.muted;
-  if(!["mist","rain","snow"].includes(s.scene))s.scene="mist";
-  if(!["rain","stream","bowl","forest","snow","quiet"].includes(s.sound))s.sound="rain";
+  if(!["mist","rain","snow","reuniverse"].includes(s.scene))s.scene="mist";
+  if(!["rain","stream","bowl","forest","snow","reuniverse","quiet"].includes(s.sound))s.sound="rain";
   if(!["idea","mood","free"].includes(s.intent))s.intent="free";
   return s;
 }
@@ -49,7 +49,9 @@ for(let i=1;i<=5;i++){const im=new Image();im.src=`a/s${i}.jpg`;}
 
 // ---------- background ----------
 let front=$("bgA"),back=$("bgB");
+var sky=null;   // set up further down (升到雲上時)
 function setBg(s,instant){
+  if(sky)sky.stage(s,instant);
   back.style.backgroundImage=`url(a/s${s+1}.jpg)`;
   if(instant){back.style.transition="none";front.style.transition="none";}
   back.classList.add("on");front.classList.remove("on");
@@ -76,12 +78,13 @@ const AC=window.AudioContext||window.webkitAudioContext;
 function setSession(){try{const a=navigator.audioSession;if(a&&a.type!=="playback")a.type="playback";}catch(e){}}
 // loops are loudness-matched (-23 LUFS) in a/v4 — see sfx/synth_v4.py
 const SRC={rain_soft:"v5/rain_drizzle",stream:"v4/stream",bowl_ambient:"v4/bowl_ambient",pad_ethereal:"v4/pad_ethereal",
-  insects_mist:"v4/insects_mist",snow_hush:"v5/snow_hush",insects_meadow:"v4/insects_meadow",sfx_save_tone:"v4/sfx_save_tone"};
+  insects_mist:"v4/insects_mist",snow_hush:"v5/snow_hush",reuniverse_hush:"v5/reuniverse_hush",insects_meadow:"v4/insects_meadow",sfx_save_tone:"v4/sfx_save_tone"};
 // one low-pass over every loop, opening up as the mist clears (Hz per scenery stage; mirrors synth_v4.py)
 const CUTOFF=[1000,1935,3740,7240,14000];
 // make-up gain (dB) for loops with a lot of top end, so opening the filter brightens rather than just gets louder
 // (measured loss in synth_v4 report, capped at 4 dB so the thickest mist still sounds a touch hushed)
-const LP_COMP={rain_soft:[4,3.5,1.1,0,0],stream:[4,2.1,.4,0,0],insects_meadow:[2.6,2,.9,0,0]};
+const LP_COMP={reuniverse_hush:[0,-.5,-1.5,-3,-4.5],   // higher up = quieter
+  rain_soft:[4,3.5,1.1,0,0],stream:[4,2.1,.4,0,0],insects_meadow:[2.6,2,.9,0,0]};
 let ctx=null,master=null,bedBus=null,lp=null,lpAt=-1;const bufs={},loading={},tracks={};
 function ensureCtx(){
   if(!AC)return null;
@@ -147,7 +150,7 @@ function checkHeard(){
     if(silent||(isIOS&&!navigator.audioSession)){st.heardHint=true;persist();showToast("聽不到聲音嗎？","看看手機側邊的靜音鍵，或把音量調大一點");}
   },1800);
 }
-const BEDS={rain:"rain_soft",stream:"stream",bowl:"bowl_ambient",snow:"snow_hush"};
+const BEDS={rain:"rain_soft",stream:"stream",bowl:"bowl_ambient",snow:"snow_hush",reuniverse:"reuniverse_hush"};
 const bedVol=(name,base)=>base*Math.pow(10,((LP_COMP[name]||[])[shown]||0)/20);
 function soundOn(){return !st.muted&&st.sound!=="quiet";}
 function syncAudio(){
@@ -274,8 +277,81 @@ function setSnowFx(on,instant){
 addEventListener("resize",()=>{if(SW)sizeSnow();});
 window.__snow={get running(){return !!snowRaf},get flakes(){return flakes.length},get y(){return flakes.slice(0,5).map(f=>Math.round(f.y))}};
 
-function setScene(v){st.scene=v;if(v!=="mist")st.lastWeather=v;persist();unlock();setRainFx(v==="rain");setSnowFx(v==="snow");syncAudio();}
-$("btnRain").onclick=()=>setScene(st.scene!=="mist"?"mist":(st.lastWeather==="snow"?"snow":"rain"));
+// ---------- 升到雲上時: a canvas sky that climbs from ground fog, through cloud, above a sea of cloud, into deep space ----------
+// muted, filmic colours; ~18 soft cloud sprites drifting downward (we are rising); drawn at ~30 fps, full rate only while rising
+const kc=$("skyCv"),kx=kc.getContext("2d");
+const SKY=[ // sky top / middle / bottom colour, where the middle sits, passing clouds (amount, screen band), drift px/s, cloud sea (amount, top edge), stars
+  {t:[66,76,82],m:[104,112,114],b:[40,46,44],mp:.58,ca:.5,band:[-.2,.72],v:16,sea:0,seaY:.95,star:0},
+  {t:[150,157,164],m:[174,180,186],b:[128,135,143],mp:.5,ca:.82,band:[-.3,1.3],v:30,sea:0,seaY:.95,star:0},
+  {t:[24,40,68],m:[62,86,116],b:[118,136,156],mp:.6,ca:.3,band:[.25,1.3],v:22,sea:.15,seaY:.95,star:0},
+  {t:[10,16,34],m:[44,50,78],b:[170,130,108],mp:.55,ca:.05,band:[.6,1.3],v:6,sea:1,seaY:.68,star:.3},
+  {t:[3,5,11],m:[6,10,22],b:[18,32,60],mp:.8,ca:0,band:[.9,1.3],v:3,sea:.25,seaY:.95,star:1}];
+const lerp=(a,b,u)=>a+(b-a)*u;
+function skyAt(s){const i=Math.min(3,Math.floor(s)),u=s-i,A=SKY[i],B=SKY[i+1];const o={};
+  for(const k in A)o[k]=Array.isArray(A[k])?A[k].map((v,j)=>lerp(v,B[k][j],u)):lerp(A[k],B[k],u);return o;}
+function puff(g,x,y,r,col,a){const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,`rgba(${col},${a})`);gr.addColorStop(.55,`rgba(${col},${a*.4})`);gr.addColorStop(1,`rgba(${col},0)`);g.fillStyle=gr;g.fillRect(x-r,y-r,2*r,2*r);}
+const SPR=[0,1,2,3].map(()=>{const c=document.createElement("canvas");c.width=320;c.height=160;const g=c.getContext("2d");
+  for(let i=0;i<26;i++)puff(g,320*(.18+.64*Math.random()),160*(.38+.3*Math.random()),160*(.14+.22*Math.random()),"255,255,255",.16+.1*Math.random());return c;});
+// the sea of cloud below us: a soft floor of flattened billows, tileable sideways, warm light grazing the top edge
+function puffE(g,x,y,rx,ry,col,a){g.save();g.translate(x,y);g.scale(1,ry/rx);puff(g,0,0,rx,col,a);g.restore();}
+const seaCv=(()=>{const W=1024,H=360,c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
+  const at=(x,y,rx,ry,col,a)=>{for(const o of[-W,0,W])puffE(g,x+o,y,rx,ry,col,a);};
+  const base=g.createLinearGradient(0,H*.16,0,H);base.addColorStop(0,"rgba(186,192,206,0)");base.addColorStop(.18,"rgba(186,192,206,.75)");base.addColorStop(1,"rgba(150,158,178,1)");
+  g.fillStyle=base;g.fillRect(0,0,W,H);
+  for(let i=0;i<90;i++){const y=H*(.16+.7*Math.random()),rx=60+Math.random()*150;at(Math.random()*W,y,rx,rx*(.28+.12*Math.random()),y<H*.4?"226,230,238":"200,206,220",.2);}
+  for(let i=0;i<34;i++){const rx=140+Math.random()*200;at(Math.random()*W,H*(.15+.08*Math.random()),rx,rx*.16,"238,214,196",.1);}   // grazing light
+  const sh=g.createLinearGradient(0,H*.45,0,H);sh.addColorStop(0,"rgba(58,66,92,0)");sh.addColorStop(1,"rgba(58,66,92,.45)");g.fillStyle=sh;g.fillRect(0,H*.45,W,H*.55);
+  return c;})();
+let starCv=null,clouds=[],KW=0,KH=0,kS=0,kTarget=0,kStar=-1,kSeaX=0,kRise=null,kRaf=0,kOn=false,kT=0,kAcc=0,kStop;
+function makeStars(){const c=document.createElement("canvas"),d=Math.min(devicePixelRatio||1,1.5);c.width=KW*d;c.height=KH*.85*d;const g=c.getContext("2d");g.scale(d,d);
+  const n=Math.round(KW*KH/2600);for(let i=0;i<n;i++){const y=Math.pow(Math.random(),1.4)*KH*.85,r=Math.random()<.08?1.1:.55+Math.random()*.35;
+    g.globalAlpha=(.25+.6*Math.random())*(1-y/(KH*.85))*.9+.1;g.fillStyle=Math.random()<.2?"#dfe6ff":"#fff";g.beginPath();g.arc(Math.random()*KW,y,r,0,6.283);g.fill();}
+  return c;}
+function newCloud(any){return{x:Math.random(),y:any?Math.random()*1.6-.3:-.35-Math.random()*.25,w:.8+Math.random()*1.1,a:.55+Math.random()*.45,spr:(Math.random()*SPR.length)|0,dx:(Math.random()-.5)*.006};}
+function sizeSky(){const d=Math.min(devicePixelRatio||1,1.5);KW=innerWidth;KH=innerHeight;kc.width=KW*d;kc.height=KH*d;kx.setTransform(d,0,0,d,0,0);
+  starCv=makeStars();if(!clouds.length)clouds=Array.from({length:reduceMotion?8:18},()=>newCloud(true));if(kStar<0)kStar=SKY[kS].star;drawSky(0);}
+const css=a=>`rgb(${a[0]|0},${a[1]|0},${a[2]|0})`;
+function drawSky(dt){
+  let rush=0;
+  if(kRise){const r=kRise;r.t+=dt;const u=Math.min(1,r.t/r.d),e=u<.5?2*u*u:1-Math.pow(2-2*u,2)/2;
+    kS=lerp(r.from,r.to,e);rush=Math.sin(Math.PI*u)*r.k;if(u>=1){kRise=null;kS=r.to;r.done&&setTimeout(r.done,0);}}
+  else if(kS!==kTarget)kS=kS<kTarget?Math.min(kTarget,kS+dt*.5):Math.max(kTarget,kS-dt*.5);   // gentle settle
+  const p=skyAt(kS),g=kx.createLinearGradient(0,0,0,KH),hz=Math.min(.999,p.seaY);
+  g.addColorStop(0,css(p.t));g.addColorStop(Math.min(p.mp,hz-.04),css(p.m));g.addColorStop(hz,css(p.b));g.addColorStop(1,css(p.b));
+  kx.globalAlpha=1;kx.fillStyle=g;kx.fillRect(0,0,KW,KH);
+  kStar+=(p.star-kStar)*(1-Math.exp(-dt/5));                        // stars surface slowly, never pop
+  if(kStar>.01){kx.globalAlpha=kStar;kx.drawImage(starCv,0,0,KW,KH*.85);}
+  if(p.sea>.01){kSeaX=(kSeaX+dt*5)%(KW*2);const w=KW*2,h=KH*.5,y=KH*p.seaY-KH*.07;kx.globalAlpha=p.sea;kx.drawImage(seaCv,-kSeaX,y,w,h);kx.drawImage(seaCv,w-kSeaX,y,w,h);}
+  const sp=p.v*(1+rush*16),ca=p.ca+rush*.6*(1-p.ca),[b0,b1]=p.band;
+  for(const k of clouds){
+    if(dt){k.y+=sp*dt/KH;k.x+=k.dx*dt;if(k.y>1.35)Object.assign(k,newCloud(false));}
+    let m=Math.min(1,Math.max(0,(k.y-b0)/.15),Math.max(0,(b1-k.y)/.15));m+=(1-m)*Math.min(1,rush);
+    const a=ca*k.a*m;if(a<.01)continue;
+    const w=KW*k.w,h=w*.5;kx.globalAlpha=Math.min(1,a);kx.drawImage(SPR[k.spr],k.x*KW-w/2,k.y*KH-h/2,w,h);}
+  kx.globalAlpha=1;
+}
+function skyFrame(t){const dt=Math.min(.1,(t-(kT||t))/1000);kT=t;kAcc+=dt;
+  if(kRise||kAcc>=1/30){drawSky(Math.min(.1,kAcc));kAcc=0;}
+  kRaf=kOn?requestAnimationFrame(skyFrame):0;}
+function setSkyFx(on,instant){
+  clearTimeout(kStop);
+  if(on){
+    if(!KW)sizeSky();
+    if(instant){const els=[kc,...document.querySelectorAll(".bg")];for(const c of els)c.style.transition="none";requestAnimationFrame(()=>requestAnimationFrame(()=>{for(const c of els)c.style.transition="";}));}
+    kS=kTarget=shown;kStar=SKY[shown].star;app.classList.add("ascending");kOn=true;
+    if(reduceMotion)drawSky(0);else if(!kRaf){kT=0;kRaf=requestAnimationFrame(skyFrame);}
+  }else{app.classList.remove("ascending");if(kRise){const d=kRise.done;kRise=null;kS=kTarget;d&&d();}kStop=setTimeout(()=>{kOn=false;},2600);}
+}
+sky={
+  stage(s,instant){kTarget=s;if(instant&&!kRise)kS=s;if(KW&&!kRaf)drawSky(0);},
+  rise(from,to,done){kTarget=to;if(!kOn||reduceMotion){kS=to;if(KW)drawSky(0);done();return;}
+    kS=from;kRise={from,to,t:0,d:5.2,k:to<=3?1:.4,done};}       // clouds rush down past us = we are going up
+};
+addEventListener("resize",()=>{if(KW)sizeSky();});
+window.__sky={get running(){return !!kRaf},get stage(){return Math.round(kS*100)/100},get star(){return Math.round(kStar*100)/100},get rising(){return !!kRise}};
+
+function setScene(v){st.scene=v;if(v!=="mist")st.lastWeather=v;persist();unlock();setRainFx(v==="rain");setSnowFx(v==="snow");setSkyFx(v==="reuniverse");syncAudio();}
+$("btnRain").onclick=()=>setScene(st.scene!=="mist"?"mist":(["snow","reuniverse"].includes(st.lastWeather)?st.lastWeather:"rain"));
 $("btnSound").onclick=()=>{unlock();if(st.sound==="quiet"){st.sound=st.lastSound||"rain";st.muted=false;}else st.muted=!st.muted;persist();syncAudio();checkHeard();};
 function setSound(v){unlock();if(v!=="quiet")st.lastSound=v;st.sound=v;st.muted=false;persist();syncAudio();checkHeard();}
 document.querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>{const k=b.dataset.set,v=b.dataset.v;
@@ -286,6 +362,7 @@ $("swTest").onclick=()=>{st.test=!st.test;persist();shown=stageOf(total());setBg
 syncAudio();
 if(st.scene==="rain")setRainFx(true,true);
 if(st.scene==="snow")setSnowFx(true,true);
+if(st.scene==="reuniverse")setSkyFx(true,true);
 
 // ---------- input ----------
 const ta=$("ta"),save=$("save");let lastInput=0;
@@ -488,13 +565,15 @@ function commit(){
 // transitions
 const vw=$("vwrap"),vid=$("vid");let vDone=null,vTimer;
 function transition(from,to){
-  busy=true;vid.src=`a/t${from+1}${from+2}.mp4`;vid.currentTime=0;
-  vw.classList.add("on");
+  busy=true;
+  if(st.scene!=="reuniverse"){vid.src=`a/t${from+1}${from+2}.mp4`;vid.currentTime=0;vw.classList.add("on");}
   const fin=()=>{if(!vDone)return;vDone=null;clearTimeout(vTimer);shown=to;setBg(to,true);renderTop();syncAudio();
     vw.classList.remove("on");setTimeout(()=>{vid.pause();},500);sfx("sfx_stage_up",.9);
     busy=false;showCenter(CONGRATS[to],STAGES[to],3200);
     if(pendingFollow){const pf=pendingFollow;pendingFollow=null;setTimeout(()=>showFollow(pf),3500);}else setTimeout(updateStarter,3500);};
-  vDone=fin;vid.onended=fin;vTimer=setTimeout(fin,9000);
+  vDone=fin;vTimer=setTimeout(fin,9000);
+  if(st.scene==="reuniverse"){sky.rise(from,to,fin);return;}       // no forest film: we rise through the clouds instead
+  vid.onended=fin;
   const pr=vid.play();if(pr)pr.catch(()=>setTimeout(fin,600));
 }
 $("skip").onclick=()=>vDone&&vDone();
@@ -640,15 +719,16 @@ document.querySelectorAll(".ocard").forEach(c=>c.onclick=()=>{
   else if(k==="sound"){setSound(v);$("oNext").classList.add("show");}   // live preview with a soft fade-in
 });
 // the sound step starts on the sound that belongs to the chosen scenery (still free to change)
+const SCENE_SOUND={rain:"rain",snow:"snow",reuniverse:"reuniverse"};
 function presetSound(scene){
-  if(oPicked.sound)return;const v=scene==="snow"?"snow":scene==="rain"?"rain":null;if(!v)return;
+  if(oPicked.sound)return;const v=SCENE_SOUND[scene];if(!v)return;
   const c=document.querySelector(`.ocard[data-k="sound"][data-v="${v}"]`);if(c)c.click();
 }
 $("oNext").onclick=finishOnb;
 $("oSkip").onclick=()=>{
   if(oStep===0){if(!oPicked.intent){st.intent="free";persist();}goStep(1);}
   else if(oStep===1){if(!oPicked.scene)setScene("mist");goStep(2);presetSound(st.scene);}
-  else{if(!oPicked.sound)setSound(st.scene==="snow"?"snow":"rain");finishOnb();}
+  else{if(!oPicked.sound)setSound(SCENE_SOUND[st.scene]||"rain");finishOnb();}
 };
 function finishOnb(){
   st.onboarded=true;persist();syncAudio();setTimeout(checkHeard,2600);

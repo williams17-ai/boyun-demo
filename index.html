@@ -96,6 +96,10 @@ canvas.fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 #app.snowing .mist{opacity:.5!important}
 canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0;transition:opacity 2.4s ease}
 #app.snowing canvas.sfx{opacity:1}
+canvas.kfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0;transition:opacity 2.4s ease}
+#app.ascending canvas.kfx{opacity:1}
+#app.ascending .bg{opacity:0!important;animation-play-state:paused}
+#app.ascending .mist,#app.ascending .snowveil,#app.ascending .rainveil{opacity:0!important}
 .icon.on{background:rgba(201,169,79,.55);opacity:1}
 .toast{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 210px);transform:translate(-50%,8px);z-index:7;max-width:86%;padding:9px 16px;border-radius:18px;background:rgba(20,28,24,.55);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.15);font-size:14px;line-height:1.5;text-align:center;opacity:0;transition:opacity .4s,transform .4s;pointer-events:none}
 .toast.show{opacity:1;transform:translate(-50%,0)}
@@ -202,13 +206,19 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
 .ocard.pic i.snowy::after{content:"";position:absolute;inset:0;background-image:radial-gradient(circle at 30% 40%,rgba(255,255,255,.85) 0 1px,transparent 1.6px),radial-gradient(circle at 70% 20%,rgba(255,255,255,.75) 0 1.6px,transparent 2.4px),radial-gradient(circle at 40% 60%,rgba(255,255,255,.55) 0 2.6px,transparent 4px);background-size:37px 41px,61px 67px,89px 97px;animation:snowthumb 12s linear infinite}
 @keyframes snowthumb{from{background-position:0 0,13px 9px,31px 22px}to{background-position:0 41px,13px 143px,31px 313px}}
 .ocards.grid .ocard:last-child:nth-child(odd){grid-column:span 2}
+.ocards.four{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ocards.four .ocard.pic i{height:22vh;max-height:210px}
+.ocard.pic i.sky{background:linear-gradient(to bottom,#05070f 0%,#111a33 34%,#383f62 54%,#a5806c 64%,#cfd3dc 69%,#a9b1c0 100%)}
+.ocard.pic i.sky::before{content:"";position:absolute;inset:0 0 40% 0;background-image:radial-gradient(circle at 20% 30%,rgba(255,255,255,.85) 0 .6px,transparent 1.1px),radial-gradient(circle at 70% 60%,rgba(230,236,255,.6) 0 .5px,transparent 1px),radial-gradient(circle at 45% 15%,rgba(255,255,255,.7) 0 .8px,transparent 1.3px),radial-gradient(circle at 85% 80%,rgba(255,255,255,.45) 0 .5px,transparent 1px);background-size:53px 47px,71px 83px,97px 89px,37px 113px;background-position:0 0,17px 29px,41px 7px,9px 51px;animation:skystars 6s ease-in-out infinite alternate}
+.ocard.pic i.sky::after{content:"";position:absolute;left:-30%;right:-30%;top:-60%;height:220%;background:radial-gradient(ellipse 40% 9% at 30% 20%,rgba(235,238,244,.5),transparent 70%),radial-gradient(ellipse 45% 10% at 70% 45%,rgba(235,238,244,.42),transparent 70%),radial-gradient(ellipse 38% 8% at 40% 70%,rgba(235,238,244,.4),transparent 70%);animation:skythumb 9s linear infinite}
+@keyframes skythumb{from{transform:translateY(-25%)}to{transform:translateY(25%)}}
+@keyframes skystars{from{opacity:.35}to{opacity:1}}
 .odots{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 34px);display:flex;justify-content:center;gap:8px}
 .odots i{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.3);transition:all .4s}
 .odots i.on{background:var(--gold);box-shadow:0 0 8px var(--gold)}
 .oend{position:absolute;left:0;right:0;top:45%;text-align:center;font-size:22px;letter-spacing:.3em;opacity:0;transition:opacity 1s ease;pointer-events:none;text-shadow:0 2px 14px rgba(0,0,0,.6)}
 .oend.on{opacity:1}
 #onb.ending .ostep,#onb.ending .odots,#onb.ending .oskip{opacity:0!important;pointer-events:none}
-@media (prefers-reduced-motion: reduce){.wbg.kb,.wmist{animation:none}.ocard.pic i.rainy::after,.ocard.pic i.snowy::after{animation:none}}
+@media (prefers-reduced-motion: reduce){.wbg.kb,.wmist{animation:none}.ocard.pic i.rainy::after,.ocard.pic i.snowy::after,.ocard.pic i.sky::before,.ocard.pic i.sky::after{animation:none}}
 </style>
 </head>
 <body>
@@ -220,6 +230,7 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   <canvas class="fx" id="glassCv"></canvas>
   <div class="snowveil"></div>
   <canvas class="sfx" id="snowCv"></canvas>
+  <canvas class="kfx" id="skyCv"></canvas>
   <div class="shade"></div>
 
   <div class="top">
@@ -283,10 +294,11 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   </section>
   <section class="ostep" data-step="1">
     <h2>想待在哪一種安靜裡？</h2>
-    <div class="ocards two three">
+    <div class="ocards three four">
       <button class="ocard pic" data-k="scene" data-v="mist"><i style="background-image:url(a/s1.jpg)"></i><b>霧起時</b></button>
       <button class="ocard pic" data-k="scene" data-v="rain"><i class="rainy" style="background-image:url(a/s2.jpg)"></i><b>雨落時</b></button>
       <button class="ocard pic" data-k="scene" data-v="snow"><i class="snowy" style="background-image:url(a/s1.jpg)"></i><b>雪落時</b></button>
+      <button class="ocard pic" data-k="scene" data-v="reuniverse"><i class="sky"></i><b>升到雲上時</b></button>
     </div>
   </section>
   <section class="ostep" data-step="2">
@@ -297,6 +309,7 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
       <button class="ocard" data-k="sound" data-v="stream"><b>溪邊</b><span>小溪和幾隻鳥</span></button>
       <button class="ocard" data-k="sound" data-v="bowl"><b>頌缽</b><span>遠遠的一聲缽響</span></button>
       <button class="ocard" data-k="sound" data-v="snow"><b>雪</b><span>曠野的風，很靜</span></button>
+      <button class="ocard" data-k="sound" data-v="reuniverse"><b>高空</b><span>越往上越安靜</span></button>
       <button class="ocard" data-k="sound" data-v="quiet"><b>安靜</b><span>什麼都不放</span></button>
     </div>
     <button id="oNext" class="wgo small">就這樣</button>
@@ -306,8 +319,8 @@ canvas.sfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
 </div>
 <div class="sheet" id="setSheet"><div class="grab"></div><h3>設定</h3>
   <div class="sgroup"><div class="slabel">今天想寫點什麼</div><div class="seg"><button data-set="intent" data-v="idea">想點子</button><button data-set="intent" data-v="mood">整理心情</button><button data-set="intent" data-v="free">隨便寫寫</button></div></div>
-  <div class="sgroup"><div class="slabel">風景</div><div class="seg"><button data-set="scene" data-v="mist">霧起時</button><button data-set="scene" data-v="rain">雨落時</button><button data-set="scene" data-v="snow">雪落時</button></div></div>
-  <div class="sgroup"><div class="slabel">聲音</div><div class="seg wrap"><button data-set="sound" data-v="rain">細雨</button><button data-set="sound" data-v="stream">溪邊</button><button data-set="sound" data-v="bowl">頌缽</button><button data-set="sound" data-v="forest">林間蟲鳴</button><button data-set="sound" data-v="snow">雪</button><button data-set="sound" data-v="quiet">安靜</button></div></div>
+  <div class="sgroup"><div class="slabel">風景</div><div class="seg"><button data-set="scene" data-v="mist">霧起時</button><button data-set="scene" data-v="rain">雨落時</button><button data-set="scene" data-v="snow">雪落時</button><button data-set="scene" data-v="reuniverse">升到雲上時</button></div></div>
+  <div class="sgroup"><div class="slabel">聲音</div><div class="seg wrap"><button data-set="sound" data-v="rain">細雨</button><button data-set="sound" data-v="stream">溪邊</button><button data-set="sound" data-v="bowl">頌缽</button><button data-set="sound" data-v="forest">林間蟲鳴</button><button data-set="sound" data-v="snow">雪</button><button data-set="sound" data-v="reuniverse">高空</button><button data-set="sound" data-v="quiet">安靜</button></div></div>
   <div class="opt"><div>遠方的低吟<small>很輕的底音，墊在聲音下面</small></div><button class="sw" id="swPad"></button></div>
   <div class="opt"><div>寫完後陪我多想一點<small>輕輕問你一句，想停隨時可以停</small></div><button class="sw" id="swFollow"></button></div>
   <div class="opt"><div>快速預覽場景<small>只要寫幾句，就能走過每一段風景（展示用）</small></div><button class="sw" id="swTest"></button></div>

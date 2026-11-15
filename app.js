@@ -72,26 +72,45 @@ setBg(shown,true);renderTop();
 
 // ---------- audio (Web Audio, gapless loops, fades) ----------
 const AC=window.AudioContext||window.webkitAudioContext;
-let ctx=null,master=null;const bufs={},loading={},tracks={};
+// iOS 17+ (Safari 16.4+): play even when the side switch is on silent. Older browsers just ignore it.
+function setSession(){try{const a=navigator.audioSession;if(a&&a.type!=="playback")a.type="playback";}catch(e){}}
+// loops are loudness-matched (-23 LUFS) in a/v4 — see sfx/synth_v4.py
+const SRC={rain_soft:"v4/rain_soft",stream:"v4/stream",bowl_ambient:"v4/bowl_ambient",pad_ethereal:"v4/pad_ethereal",
+  insects_mist:"v4/insects_mist",insects_meadow:"v4/insects_meadow",sfx_save_tone:"v4/sfx_save_tone"};
+// one low-pass over every loop, opening up as the mist clears (Hz per scenery stage; mirrors synth_v4.py)
+const CUTOFF=[1000,1935,3740,7240,14000];
+// make-up gain (dB) for loops with a lot of top end, so opening the filter brightens rather than just gets louder
+// (measured loss in synth_v4 report, capped at 4 dB so the thickest mist still sounds a touch hushed)
+const LP_COMP={rain_soft:[4,3.5,1.1,0,0],stream:[4,2.1,.4,0,0],insects_meadow:[2.6,2,.9,0,0]};
+let ctx=null,master=null,bedBus=null,lp=null,lpAt=-1;const bufs={},loading={},tracks={};
 function ensureCtx(){
   if(!AC)return null;
+  setSession();
   if(!ctx){ctx=new AC();master=ctx.createGain();master.gain.value=1;master.connect(ctx.destination);
+    lp=ctx.createBiquadFilter();lp.type="lowpass";lp.Q.value=.707;lp.frequency.value=CUTOFF[shown];lpAt=shown;
+    bedBus=ctx.createGain();bedBus.connect(lp);lp.connect(master);
     const b=ctx.createBuffer(1,1,22050),s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);s.start(0);}
   if(ctx.state!=="running")ctx.resume().catch(()=>{});
   return ctx;
 }
+function setFilter(stage){
+  if(!lp||stage===lpAt)return;lpAt=stage;
+  const now=ctx.currentTime,p=lp.frequency;
+  p.cancelScheduledValues(now);p.setValueAtTime(Math.max(20,p.value),now);
+  p.exponentialRampToValueAtTime(CUTOFF[stage],now+5);          // exponential = even, slow opening to the ear
+}
 function load(name){
   if(bufs[name])return Promise.resolve(bufs[name]);
   if(loading[name])return loading[name];
-  return loading[name]=fetch(`a/${name}.mp3`).then(r=>r.arrayBuffer()).then(ab=>new Promise((res,rej)=>ctx.decodeAudioData(ab,res,rej))).then(b=>(bufs[name]=b));
+  return loading[name]=fetch(`a/${SRC[name]||name}.mp3`).then(r=>r.arrayBuffer()).then(ab=>new Promise((res,rej)=>ctx.decodeAudioData(ab,res,rej))).then(b=>(bufs[name]=b));
 }
 function fadeTo(g,v,sec){const now=ctx.currentTime;g.gain.cancelScheduledValues(now);g.gain.setValueAtTime(g.gain.value,now);g.gain.linearRampToValueAtTime(v,now+sec);}
 function setLoop(name,vol,sec){
   if(!ctx)return;sec=sec||2.5;
   let t=tracks[name];
   if(vol>0){
-    if(t){fadeTo(t.g,vol,sec);t.want=vol;return;}
-    tracks[name]=t={want:vol,g:ctx.createGain(),src:null};t.g.gain.value=0;t.g.connect(master);
+    if(t){if(Math.abs(t.want-vol)>1e-4){fadeTo(t.g,vol,sec);t.want=vol;}return;}
+    tracks[name]=t={want:vol,g:ctx.createGain(),src:null};t.g.gain.value=0;t.g.connect(bedBus);
     load(name).then(b=>{
       if(tracks[name]!==t)return;
       const src=ctx.createBufferSource();src.buffer=b;src.loop=true;
@@ -104,23 +123,41 @@ function setLoop(name,vol,sec){
     setTimeout(()=>{try{t.src&&t.src.stop();}catch(e){}t.g.disconnect();},sec*1000+200);
   }
 }
-function sfx(name,vol){
+function sfx(name,vol,rate){
   if(!ensureCtx())return;
-  load(name).then(b=>{const s=ctx.createBufferSource(),g=ctx.createGain();g.gain.value=vol||.8;s.buffer=b;s.connect(g);g.connect(master);s.start();}).catch(()=>{});
+  load(name).then(b=>{const s=ctx.createBufferSource(),g=ctx.createGain();g.gain.value=vol||.8;s.buffer=b;if(rate)s.playbackRate.value=rate;s.connect(g);g.connect(master);s.start();}).catch(()=>{});
+}
+// saving an idea: the same soft tone, a different note of the pentatonic scale each time (never twice in a row)
+const PENTA=[-5,-3,0,2,4,7];let lastNote=-1;
+function saveTone(vol){
+  let i;do{i=Math.floor(Math.random()*PENTA.length);}while(i===lastNote);lastNote=i;
+  const semi=PENTA[i];sfx("sfx_save_tone",vol*Math.pow(2,-semi/48),Math.pow(2,semi/12));   // higher notes a hair softer
 }
 let unlocked=false;
-function unlock(){if(unlocked)return;unlocked=true;ensureCtx();["sfx_idea_saved","sfx_stage_up"].forEach(n=>load(n).catch(()=>{}));syncAudio();}
+function unlock(){if(unlocked)return;unlocked=true;ensureCtx();["sfx_save_tone","sfx_stage_up"].forEach(n=>load(n).catch(()=>{}));syncAudio();checkHeard();}
 document.addEventListener("touchend",unlock,{passive:true});document.addEventListener("click",unlock);
-document.addEventListener("visibilitychange",()=>{if(!ctx)return;if(document.hidden)ctx.suspend();else ctx.resume();});
+document.addEventListener("visibilitychange",()=>{if(!ctx)return;if(document.hidden)ctx.suspend();else{setSession();ctx.resume();}});
+// a gentle, one-time nudge when the phone may be keeping us silent
+const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+function checkHeard(){
+  if(st.heardHint||!st.onboarded)return;
+  setTimeout(()=>{
+    if(st.heardHint||!soundOn())return;
+    const silent=!ctx||ctx.state!=="running";
+    if(silent||(isIOS&&!navigator.audioSession)){st.heardHint=true;persist();showToast("聽不到聲音嗎？","看看手機側邊的靜音鍵，或把音量調大一點");}
+  },1800);
+}
 const BEDS={rain:"rain_soft",stream:"stream",bowl:"bowl_ambient"};
+const bedVol=(name,base)=>base*Math.pow(10,((LP_COMP[name]||[])[shown]||0)/20);
 function soundOn(){return !st.muted&&st.sound!=="quiet";}
 function syncAudio(){
   const on=soundOn();
   if(ctx){
-    for(const k in BEDS)setLoop(BEDS[k],on&&st.sound===k?.5:0,2.5);
-    setLoop("ambience_misty_jungle",on&&st.sound==="forest"&&shown<=2?.45:0,3);
-    setLoop("ambience_meadow",on&&st.sound==="forest"&&shown>2?.45:0,3);
-    setLoop("pad_ethereal",on&&st.pad?.16:0,4);
+    setFilter(shown);
+    for(const k in BEDS)setLoop(BEDS[k],on&&st.sound===k?bedVol(BEDS[k],1):0,2.5);
+    setLoop("insects_mist",on&&st.sound==="forest"&&shown<=2?bedVol("insects_mist",1):0,3);
+    setLoop("insects_meadow",on&&st.sound==="forest"&&shown>2?bedVol("insects_meadow",1):0,3);
+    setLoop("pad_ethereal",on&&st.pad?.4:0,4);
   }
   $("btnSound").classList.toggle("on",on);$("btnRain").classList.toggle("on",st.scene==="rain");
   $("sndIcon").innerHTML=on?'<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/>':'<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/>';
@@ -196,13 +233,13 @@ function setRainFx(on,instant){
   }
 }
 addEventListener("resize",()=>{if(W){sizeFx();}});
-window.__audio=()=>Object.keys(tracks);
+window.__audio=()=>Object.keys(tracks);window.__lp=()=>lp?Math.round(lp.frequency.value):null;
 window.__fx={get running(){return !!rafId},get drops(){return drops.length},get beads(){return beads.length}};
 
 function setScene(v){st.scene=v;persist();unlock();setRainFx(v==="rain");syncAudio();}
 $("btnRain").onclick=()=>setScene(st.scene==="rain"?"mist":"rain");
-$("btnSound").onclick=()=>{unlock();if(st.sound==="quiet"){st.sound=st.lastSound||"rain";st.muted=false;}else st.muted=!st.muted;persist();syncAudio();};
-function setSound(v){unlock();if(v!=="quiet")st.lastSound=v;st.sound=v;st.muted=false;persist();syncAudio();}
+$("btnSound").onclick=()=>{unlock();if(st.sound==="quiet"){st.sound=st.lastSound||"rain";st.muted=false;}else st.muted=!st.muted;persist();syncAudio();checkHeard();};
+function setSound(v){unlock();if(v!=="quiet")st.lastSound=v;st.sound=v;st.muted=false;persist();syncAudio();checkHeard();}
 document.querySelectorAll("[data-set]").forEach(b=>b.onclick=()=>{const k=b.dataset.set,v=b.dataset.v;
   if(k==="sound")setSound(v);else if(k==="scene")setScene(v);else{st[k]=v;persist();syncAudio();}});
 $("swPad").onclick=()=>{unlock();st.pad=!st.pad;persist();syncAudio();};
@@ -217,6 +254,8 @@ const fit=()=>{ta.style.height="auto";ta.style.height=Math.min(ta.scrollHeight,i
 ta.addEventListener("input",()=>{fit();lastInput=Date.now();});
 if(st.onboarded)setTimeout(()=>ta.focus(),300);
 save.onclick=commit;
+// desktop: Cmd/Ctrl+Enter saves straight away (not while an IME is still composing)
+ta.addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)&&!e.isComposing){e.preventDefault();commit();}});
 let sy=null;
 $("card").addEventListener("touchstart",e=>{sy=e.touches[0].clientY;},{passive:true});
 $("card").addEventListener("touchmove",e=>{if(sy===null||!ta.value.trim())return;const dy=sy-e.touches[0].clientY;if(dy>0)$("composer").style.transform=`translateY(${-Math.min(dy,80)*.5}px)`;},{passive:true});
@@ -334,7 +373,7 @@ function closeChain(rid,kind){
   const before=stageOf(total());
   r.closed=true;r.paused=kind==="pause";
   if(!r.bonused){r.bonused=true;st.bonus++;}
-  persist();glow();sfx(kind==="pause"?"sfx_pause":"sfx_idea_saved",.6);
+  persist();glow();if(kind==="pause")sfx("sfx_pause",.6);else saveTone(.7);
   showCenter(line,null,3200);
   renderTop();
   const after=stageOf(total());
@@ -385,13 +424,13 @@ function commit(){
   st.ideas.unshift(idea);persist();
   if(!isChain)lastRoot=idea;
   const after=stageOf(total());
-  ta.value="";fit();ta.blur();card0=null;hideCard();setCx(null);
+  ta.value="";fit();card0=null;hideCard();setCx(null);
   // orb
   const r=$("card").getBoundingClientRect();
   const o=document.createElement("div");o.className="orb";o.style.left=(r.left+r.width/2-9)+"px";o.style.top=(r.top+30)+"px";document.body.appendChild(o);
   const dx=(Math.random()-.5)*120,ty=-(r.top+30-innerHeight*.22);
   o.animate([{transform:"translate(0,0) scale(.6)",opacity:0},{transform:"translate(0,-20px) scale(1.4)",opacity:1,offset:.15},{transform:`translate(${dx}px,${ty}px) scale(.5)`,opacity:0}],{duration:2200,easing:"cubic-bezier(.3,.6,.3,1)"}).onfinish=()=>o.remove();
-  sfx("sfx_idea_saved",.8);
+  saveTone(.9);
   const cmp=$("composer");cmp.classList.add("sent");setTimeout(()=>cmp.classList.remove("sent"),650);
   const sub=fb.quiet||Math.random()<.5?null:SUB[fb.lang][Math.floor(Math.random()*3)];
   renderTop();
@@ -541,7 +580,7 @@ function hideOv(el,ms){el.classList.remove("vis");setTimeout(()=>el.classList.re
 function showWelcome(){W_.classList.remove("through");showOv(W_);ta.blur();}
 let oStep=0,oPicked={};
 $("wGo").onclick=()=>{
-  unlock();sfx("sfx_idea_saved",.7);             // first gesture: wake the audio, a soft bowl
+  unlock();saveTone(.8);                         // first gesture: wake the audio, a soft tone
   W_.classList.add("through");                   // pass through the foliage
   setTimeout(()=>{oStep=0;oPicked={};O_.classList.remove("ending");$("oEnd").classList.remove("on");
     document.querySelectorAll(".ocard").forEach(c=>c.classList.toggle("sel",false));$("oNext").classList.remove("show");
@@ -568,7 +607,7 @@ $("oSkip").onclick=()=>{
   else{if(!oPicked.sound)setSound("rain");finishOnb();}
 };
 function finishOnb(){
-  st.onboarded=true;persist();syncAudio();
+  st.onboarded=true;persist();syncAudio();setTimeout(checkHeard,2600);
   O_.classList.add("ending");setTimeout(()=>$("oEnd").classList.add("on"),300);
   setTimeout(()=>{hideOv(O_,1000);setTimeout(()=>{if(!card&&!cx&&!ta.value.trim())showStarter();},700);},2100);  // the first prompt is already waiting
 }

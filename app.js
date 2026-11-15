@@ -155,7 +155,7 @@ const bedVol=(name,base)=>base*Math.pow(10,((LP_COMP[name]||[])[shown]||0)/20);
 function soundOn(){return !st.muted&&st.sound!=="quiet";}
 function syncAudio(){
   const on=soundOn();
-  if(ctx){
+  if(ctx&&!introOn){   // while the intro plays, it chooses the sounds
     setFilter(shown);
     for(const k in BEDS)setLoop(BEDS[k],on&&st.sound===k?bedVol(BEDS[k],1):0,2.5);
     setLoop("insects_mist",on&&st.sound==="forest"&&shown<=2?bedVol("insects_mist",1):0,3);
@@ -692,19 +692,14 @@ const chips=$("chips");for(let i=0;i<4;i++){const b=document.createElement("butt
 const back0=document.createElement("button");back0.className="chip";back0.textContent="回到我現在的位置";back0.onclick=()=>{shown=stageOf(total());setBg(shown);renderTop();syncAudio();close();};chips.appendChild(back0);
 $("reset").onclick=()=>{if(!confirm("確定要清除所有點子嗎？"))return;st.ideas=[];st.bonus=0;streak=0;hideCard();setCx(null);persist();shown=0;setBg(0);renderTop();syncAudio();close();};
 // ---------- welcome + onboarding (first launch; again from settings) ----------
-const W_=$("welcome"),O_=$("onb");
+const O_=$("onb");
 function showOv(el){el.classList.add("on");requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add("vis")));}
 function hideOv(el,ms){el.classList.remove("vis");setTimeout(()=>el.classList.remove("on"),ms||900);}
-function showWelcome(){W_.classList.remove("through");showOv(W_);ta.blur();}
 let oStep=0,oPicked={};
-$("wGo").onclick=()=>{
-  unlock();saveTone(.8);                         // first gesture: wake the audio, a soft tone
-  W_.classList.add("through");                   // pass through the foliage
-  setTimeout(()=>{oStep=0;oPicked={};O_.classList.remove("ending");$("oEnd").classList.remove("on");
-    document.querySelectorAll(".ocard").forEach(c=>c.classList.toggle("sel",false));$("oNext").classList.remove("show");
-    goStep(0);showOv(O_);},1250);
-  setTimeout(()=>hideOv(W_,50),1900);
-};
+function startOnb(){
+  oStep=0;oPicked={};O_.classList.remove("ending");$("oEnd").classList.remove("on");
+  document.querySelectorAll(".ocard").forEach(c=>c.classList.toggle("sel",false));$("oNext").classList.remove("show");
+  goStep(0);showOv(O_);}
 function goStep(i){
   oStep=i;
   document.querySelectorAll(".ostep").forEach(s=>s.classList.toggle("on",+s.dataset.step===i));
@@ -735,7 +730,221 @@ function finishOnb(){
   O_.classList.add("ending");setTimeout(()=>$("oEnd").classList.add("on"),300);
   setTimeout(()=>{hideOv(O_,1000);setTimeout(()=>{if(!card&&!cx&&!ta.value.trim())showStarter();},700);},2100);  // the first prompt is already waiting
 }
-$("reWelcome").onclick=()=>{close();setTimeout(showWelcome,350);};
-if(!st.onboarded)showWelcome();
+// ---------- first open: the journey of one drop (Kumoma 雲間 intro) ----------
+// One canvas, drawn as a pure function of time t, so tapping ahead, skipping and reduced motion are all just "which t to draw".
+// The same drop is the subject throughout; every scene starts where the previous one left it.
+const I_=$("intro"),icv=$("introCv"),ix=icv.getContext("2d"),ibuf=document.createElement("canvas"),ilay=document.createElement("canvas");
+const ZH=(document.documentElement.lang||"zh").toLowerCase().startsWith("zh");
+const IT={start:[0,2.4,4.8,7.2,12.2,16.6],title:16.9,tag:17.4,btn:18.0,hold:19.4};
+const ICAP=[[.3,2.3,"雲裡，有什麼正在凝聚","In the clouds, something begins to gather."],
+  [2.65,4.7,"隨雨落下，在葉尖停了一下","Falling with the rain, it pauses on a leaf's tip."],
+  [5.05,7.1,"在高處結成雪，又靜靜化開","High above, it turns to snow, then quietly melts."],
+  [7.4,9.2,"從山縫滴下，隨溪流入海","Dripping from the mountain, flowing with the stream into the sea."],
+  [9.3,10.7,"越沉越深，直到最靜的地方","Deeper and deeper, down to the stillest place."],
+  [12.6,16.4,"遇光而升，穿過雲間，觸到星空的靜","Meeting the light, it rises through the clouds and touches the silence of the stars."]];
+// reduced motion: one still per moment, cross-faded (segment start -> the instant shown)
+const IREP=[[0,1.9],[2.4,3.6],[4.8,5.9],[7.2,8.5],[9.25,10.2],[11.2,11.7],[12.2,15.3],[16.6,99]];
+let X=ix,IW=0,IH=0,iRaf=0,iBase=0,iAt=0,iOn=false,iThen="onb",iSilent=false,iCapI=-1,iCapEl=null,iRep=-1,iTick=0,iLast=0,iRock=null,iStars=null,iRidge=null,uwG=null;
+var introOn=false;
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)),sm=(a,b,v)=>{const x=clamp((v-a)/(b-a));return x*x*(3-2*x);};
+const rnd=i=>{const s=Math.sin(i*127.1+311.7)*43758.5453;return s-Math.floor(s);};
+const iNow=()=>iBase+(performance.now()-iAt)/1000,setT=t=>{iBase=t;iAt=performance.now();};
+const sceneOf=t=>{let i=0;for(let k=0;k<6;k++)if(t>=IT.start[k])i=k;return i;};
+// ---- painting helpers (draw into X, which is the screen or the cross-fade buffer) ----
+function vgrad(stops,y0=0,y1=IH){const a=Math.max(0,y0),b=Math.min(IH,y1);if(b<=a)return;const g=X.createLinearGradient(0,y0,0,y1);for(const[p,c]of stops)g.addColorStop(p,c);X.fillStyle=g;X.fillRect(0,a,IW,b-a);}
+function soft(x,y,r,col,a,add){if(a<.005||r<.5)return;if(add)X.globalCompositeOperation="lighter";const g=X.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,`rgba(${col},${a})`);g.addColorStop(1,`rgba(${col},0)`);X.fillStyle=g;X.fillRect(x-r,y-r,2*r,2*r);X.globalCompositeOperation="source-over";}
+function cloudSprites(n,seed,y0,speed,alpha,u){   // drifting / rushing cloud puffs, positions from t only
+  for(let i=0;i<n;i++){const k=seed+i,w=IW*(.9+rnd(k+5)*1.1),h=w*.5;
+    let y=((rnd(k+3)*1.7-.35)+y0)%1.7;if(y<0)y+=1.7;y-=.35;
+    const x=(rnd(k)*1.4-.2)*IW+u*(rnd(k+9)-.5)*24;X.globalAlpha=clamp(alpha*(.45+.55*rnd(k+7)));
+    X.drawImage(SPR[k%SPR.length],x-w/2,y*IH-h/2,w,h);}
+  X.globalAlpha=1;}
+function drop(x,y,r,st,a,cold){
+  if(r<.4||a<.01)return;soft(x,y,r*4.5,cold?"190,215,235":"235,240,235",.16*a,true);
+  X.save();X.globalAlpha=a;X.translate(x,y);X.scale(1,1+st);
+  X.beginPath();X.moveTo(0,-r*1.9);X.bezierCurveTo(r*.55,-r*1.1,r,-r*.4,r,r*.12);X.arc(0,r*.12,r,0,Math.PI);X.bezierCurveTo(-r,-r*.4,-r*.55,-r*1.1,0,-r*1.9);X.closePath();
+  const g=X.createRadialGradient(-r*.3,-r*.25,r*.1,0,0,r*1.6);
+  g.addColorStop(0,"rgba(255,255,255,.7)");g.addColorStop(.45,cold?"rgba(175,200,222,.42)":"rgba(196,210,214,.38)");g.addColorStop(1,cold?"rgba(90,120,150,.75)":"rgba(105,125,130,.72)");
+  X.fillStyle=g;X.fill();X.strokeStyle="rgba(255,255,255,.4)";X.lineWidth=.8;X.stroke();
+  X.fillStyle="rgba(255,255,255,.9)";X.beginPath();X.ellipse(-r*.38,-r*.28,r*.22,r*.3,-.5,0,6.283);X.fill();
+  X.strokeStyle="rgba(255,255,255,.35)";X.lineWidth=1;X.beginPath();X.arc(0,r*.12,r*.72,.35,Math.PI-.35);X.stroke();
+  X.restore();}
+function flake(x,y,s,rot,a){
+  if(a<.01)return;soft(x,y,s*2.4,"220,232,250",.18*a,true);
+  X.save();X.translate(x,y);X.rotate(rot);X.globalAlpha=a;X.strokeStyle="rgba(244,248,255,.95)";X.lineCap="round";
+  for(let k=0;k<6;k++){X.rotate(Math.PI/3);X.lineWidth=1.3;X.beginPath();X.moveTo(0,0);X.lineTo(0,-s);
+    for(const[p,l]of[[.42,.28],[.68,.2]]){X.moveTo(0,-s*p);X.lineTo(s*l,-s*(p+l*.8));X.moveTo(0,-s*p);X.lineTo(-s*l,-s*(p+l*.8));}X.lineWidth=.9;X.stroke();}
+  X.restore();}
+function sea(seaY,a,u,gap){       // the sea of cloud below; gap = width of the opening in the middle (scene 6)
+  if(a<.01)return;const L=ilay.getContext("2d");L.setTransform(1,0,0,1,0,0);L.clearRect(0,0,ilay.width,ilay.height);const d=ilay.width/IW;L.setTransform(d,0,0,d,0,0);
+  const w=IW*2,h=IH*.5,y=IH*seaY-IH*.07,sx=(u*5)%w;L.drawImage(seaCv,-sx,y,w,h);L.drawImage(seaCv,w-sx,y,w,h);
+  if(gap>1){L.globalCompositeOperation="destination-out";const cy=IH*seaY+IH*.035;L.save();L.translate(IW/2,cy);L.scale(1,.34);
+    const g=L.createRadialGradient(0,0,0,0,0,gap);g.addColorStop(0,"rgba(0,0,0,1)");g.addColorStop(.55,"rgba(0,0,0,.85)");g.addColorStop(1,"rgba(0,0,0,0)");L.fillStyle=g;L.fillRect(-gap,-gap,2*gap,2*gap);L.restore();L.globalCompositeOperation="source-over";}
+  X.globalAlpha=a;X.drawImage(ilay,0,0,IW,IH);X.globalAlpha=1;}
+function iPrep(){
+  for(const c of[ibuf,ilay]){c.width=icv.width;c.height=icv.height;}
+  const d=icv.width/IW;
+  iStars=document.createElement("canvas");iStars.width=IW*d;iStars.height=IH*.72*d;{const g=iStars.getContext("2d");g.scale(d,d);
+    for(let i=0,n=Math.round(IW*IH/2300);i<n;i++){const y=Math.pow(rnd(i*3+1),1.3)*IH*.72;g.globalAlpha=(.2+.7*rnd(i*3+2))*(1-y/(IH*.8));g.fillStyle=rnd(i)<.2?"#dfe6ff":"#fff";g.beginPath();g.arc(rnd(i*3)*IW,y,rnd(i*7)<.07?1.15:.5+.4*rnd(i*5),0,6.283);g.fill();}}
+  iRidge=[0,1].map(r=>Array.from({length:26},(_,i)=>{const p=i/25;return Math.sin(p*7+r*2)*.35+Math.sin(p*17+r)*.18+rnd(i+r*40)*.3;}));
+  // rock face with a crack, where the drop comes out
+  iRock=document.createElement("canvas");iRock.width=IW*d;iRock.height=IH*.7*d;{const g=iRock.getContext("2d");g.scale(d,d);const H=IH*.7;
+    const f=g.createLinearGradient(0,0,0,H);f.addColorStop(0,"#2c3234");f.addColorStop(1,"#171b1d");g.fillStyle=f;g.fillRect(0,0,IW,H);
+    for(let i=0;i<140;i++){const x=rnd(i)*IW,y=rnd(i+1)*H,r=12+rnd(i+2)*60,gr=g.createRadialGradient(x,y,0,x,y,r),c=rnd(i+3)<.45?"255,255,255,.05":"0,0,0,.28";   // weathered patches
+      gr.addColorStop(0,`rgba(${c})`);gr.addColorStop(1,"rgba(0,0,0,0)");g.fillStyle=gr;g.fillRect(x-r,y-r,2*r,2*r);}
+    for(let i=0;i<16;i++){let x=rnd(i+300)*IW,y=rnd(i+301)*H;const dx=(rnd(i+302)-.5)*1.6;g.beginPath();g.moveTo(x,y);      // a few slanting fractures
+      for(let k=0;k<5;k++){x+=dx*14+(rnd(i*9+k)-.5)*10;y+=10+rnd(i*7+k)*16;g.lineTo(x,y);}g.strokeStyle="rgba(0,0,0,.4)";g.lineWidth=.9;g.stroke();}
+    g.globalCompositeOperation="destination-out";g.beginPath();g.moveTo(0,0);for(let i=0;i<=20;i++)g.lineTo(IW*i/20,IH*(.012+.03*rnd(i+90))*(Math.abs(i-10)<2?0.4:1));g.lineTo(IW,0);g.fill();g.globalCompositeOperation="source-over";
+    let x=IW/2,y=IH*.03;g.beginPath();g.moveTo(x,y);while(y<H){y+=8+rnd(y)*16;x=IW/2+(rnd(y+1)-.5)*10;g.lineTo(x,y);}g.strokeStyle="#07090a";g.lineWidth=2.4;g.stroke();g.strokeStyle="rgba(255,255,255,.07)";g.lineWidth=.8;g.translate(1.4,0);g.stroke();}
+}
+// ---- the six moments ----
+function s1(u){vgrad([[0,"#7d878b"],[.5,"#9aa2a5"],[1,"#5a6266"]]);cloudSprites(14,10,u*.004,0,.62,u);
+  const cx=IW/2,cy=IH*.4;
+  for(let i=0;i<26;i++){const p=sm(.15,2.0,u+rnd(i+50)*.35),ang=rnd(i+60)*6.283,R=IW*(.22+.25*rnd(i+70))*(1-p);soft(cx+Math.cos(ang)*R,cy+Math.sin(ang)*R*.8,3.5,"255,255,255",.5*Math.sin(Math.PI*p),true);}
+  const r=7*sm(.45,2.05,u);soft(cx,cy,40*sm(.3,2.1,u),"255,255,250",.18,true);drop(cx,cy,r,0,sm(.4,1.2,u));}
+const tipX=()=>IW*.5,tipY=()=>IH*.565;
+function s2(u){vgrad([[0,"#4c5759"],[.6,"#384244"],[1,"#232a2c"]]);cloudSprites(8,30,0,0,.22,u);
+  const ra=sm(0,.5,u);X.strokeStyle="rgba(210,222,230,1)";X.lineWidth=.8;
+  for(let i=0;i<70;i++){const v=900+rnd(i+1)*500,l=16+rnd(i+2)*18,y=((rnd(i+3)*(IH+80)+u*v)%(IH+80))-40,x=rnd(i)*IW*1.3-IW*.15+y*.22;X.globalAlpha=(.1+.16*rnd(i+4))*ra;X.beginPath();X.moveTo(x,y);X.lineTo(x+l*.22,y+l);X.stroke();}
+  X.globalAlpha=1;
+  const sag=u<1.55?5*sm(.6,.85,u):5*Math.exp(-(u-1.55)*5)*Math.cos((u-1.55)*18);
+  const tx=tipX(),ty=tipY()+sag;          // the leaf, reaching in from the right
+  X.beginPath();X.moveTo(IW*1.08,IH*.47);X.quadraticCurveTo(IW*.78,IH*.47,tx,ty);X.quadraticCurveTo(IW*.8,IH*.6,IW*1.08,IH*.53);X.closePath();
+  const lg=X.createLinearGradient(tx,0,IW,0);lg.addColorStop(0,"#4c604f");lg.addColorStop(1,"#26332a");X.fillStyle=lg;X.globalAlpha=sm(0,.4,u);X.fill();
+  X.strokeStyle="rgba(200,220,190,.25)";X.lineWidth=1;X.beginPath();X.moveTo(IW*1.08,IH*.5);X.quadraticCurveTo(IW*.8,IH*.52,tx+3,ty);X.stroke();X.globalAlpha=1;
+  const r=7;let x=IW/2,y,st=0;
+  if(u<.7){const p=(u/.7)**2;y=lerp(IH*.4,ty+r,p);st=.25*p;}
+  else if(u<1.55){y=ty+r*(1+.12*Math.sin((u-.7)*9));x+=Math.sin(u*38)*1.1*sm(.85,1.05,u)*(1-sm(1.35,1.55,u));}
+  else{const p=((u-1.55)/.85)**2;y=lerp(tipY()+r,IH*.7,p);st=.3*p;}
+  drop(x,y,r,st,1);}
+function s3(u){vgrad([[0,"#6a7681"],[.55,"#535e69"],[1,"#323a43"]]);cloudSprites(8,50,0,0,.3,u);
+  for(let i=0;i<34;i++){const y=((rnd(i+1)*IH+u*(14+rnd(i+2)*22))%IH),x=rnd(i)*IW+Math.sin(u*.8+i)*8;soft(x,y,1.6+rnd(i+3)*2.2,"240,245,255",.55*sm(0,.6,u),false);}
+  const y=lerp(IH*.7,IH*.755,u/2.4),x=IW/2+Math.sin(u*1.7)*10*sm(.3,.8,u)*(1-sm(1.9,2.4,u));
+  const m=sm(.2,.75,u)*(1-sm(1.55,2.1,u));
+  drop(x,y,7*(1-m),0,1-m,true);flake(x,y,7+7*m,u*.55,m);}
+function s4(u){
+  const off=sm(.35,3.85,u)*3.2*IH,wy=y=>y*IH-off;
+  vgrad([[0,"#3a4552"],[.62,"#6e7983"],[1,"#58626b"]],wy(0),wy(1.0));
+  iRidge.forEach((pts,r)=>{const base=.6+r*.06,amp=IH*(.05+r*.025);X.fillStyle=r?"#3c454d":"#5a656e";X.beginPath();X.moveTo(0,wy(1.0));
+    pts.forEach((h,i)=>X.lineTo(IW*i/25,wy(base)-h*amp));X.lineTo(IW,wy(1.0));X.fill();});
+  X.drawImage(iRock,0,wy(.71),IW,IH*.7);
+  vgrad([[0,"#22292b"],[.08,"#4b6367"],[1,"#38525a"]],wy(1.36),wy(1.72));                         // the stream
+  X.strokeStyle="rgba(220,235,235,1)";X.lineWidth=1;
+  for(let i=0;i<46;i++){const yy=wy(1.39+rnd(i+1)*.31),xx=((rnd(i)*(IW+60)+u*(50+rnd(i+2)*70))%(IW+60))-30,l=10+rnd(i+3)*26;X.globalAlpha=.1+.2*rnd(i+4);X.beginPath();X.moveTo(xx,yy);X.lineTo(xx+l,yy);X.stroke();}
+  X.globalAlpha=1;
+  vgrad([[0,"#2f5361"],[.18,"#173445"],[.42,"#0a1a27"],[.65,"#03080e"],[.85,"#000"],[1,"#000"]],wy(1.72),wy(4.4));   // into the sea
+  X.fillStyle="rgba(200,222,232,.5)";X.fillRect(0,wy(1.72),IW,1.2);
+  for(let k=0;k<4;k++){const x0=IW*(.15+.22*k);X.globalAlpha=.07*(1-sm(1.8,2.6,(off/IH)+.5));X.fillStyle="#cfe3ea";X.beginPath();X.moveTo(x0,wy(1.72));X.lineTo(x0+30,wy(1.72));X.lineTo(x0+150,wy(2.6));X.lineTo(x0+60,wy(2.6));X.fill();}
+  X.globalAlpha=1;
+  for(let i=0;i<50;i++){const w=1.8+rnd(i+1)*2.4,yy=wy(w);if(yy<-5||yy>IH+5)continue;soft(rnd(i)*IW,yy,1.6,"190,215,225",.35*(1-sm(2.2,3.6,w)),false);}
+  const y=lerp(IH*.755,IH*.45,sm(.3,1.4,u)),depth=(y+off)/IH;
+  drop(IW/2,y,7*(1+.06*Math.sin(u*3)*(1-sm(.2,.4,u))),u>.35&&u<1.4?.18:0,1-.92*sm(2.0,3.9,depth),depth>1.72);
+  X.fillStyle=`rgba(0,0,0,${sm(3.65,4.0,u)})`;X.fillRect(0,0,IW,IH);}
+function s5(u){
+  const rise=sm(1.5,2.5,u),top=lerp(3.3,.9,rise);        // camera climbing back up through the water
+  X.fillStyle="#000";X.fillRect(0,0,IW,IH);
+  const wy=y=>(y-top)*IH;
+  vgrad([[0,"#2f5361"],[.18,"#173445"],[.42,"#0a1a27"],[.65,"#03080e"],[.85,"#000"],[1,"#000"]],wy(1.72),wy(4.4));
+  if(wy(1.72)>0){X.fillStyle="#97a2a8";X.fillRect(0,0,IW,wy(1.72));X.fillStyle="rgba(230,240,245,.7)";X.fillRect(0,wy(1.72)-1,IW,2);}
+  const beam=sm(.15,1.0,u)*(1-sm(2.2,2.8,u));             // light from the surface
+  if(beam>0){X.globalCompositeOperation="lighter";const g=X.createLinearGradient(0,0,0,IH*.85);g.addColorStop(0,`rgba(175,205,220,${.38*beam})`);g.addColorStop(1,"rgba(175,205,220,0)");
+    X.fillStyle=g;X.beginPath();X.moveTo(IW*.44,0);X.lineTo(IW*.56,0);X.lineTo(IW*.8,IH*.85);X.lineTo(IW*.2,IH*.85);X.fill();X.globalCompositeOperation="source-over";}
+  const c0=sm(2.15,2.45,u);                                  // above the water: into the clouds, then the dark blue
+  if(c0>0){X.globalAlpha=c0;const k=sm(2.5,3.9,u),col=(a,b)=>`rgb(${lerp(a[0],b[0],k)|0},${lerp(a[1],b[1],k)|0},${lerp(a[2],b[2],k)|0})`;
+    vgrad([[0,col([150,158,165],[10,16,34])],[.6,col([172,179,185],[30,42,72])],[1,col([140,148,156],[48,60,92])]]);X.globalAlpha=1;
+    X.globalAlpha=sm(3.3,4.4,u);X.drawImage(iStars,0,0,IW,IH*.72);X.globalAlpha=1;
+    sea(.72,sm(3.4,4.3,u),u,0);
+    cloudSprites(18,80,3.4*sm(2.1,3.95,u),0,.95*c0*(1-sm(3.4,3.95,u)),u);}
+  const x=IW/2,y=lerp(IH*.45,IH*.4,sm(1.0,2.2,u)),vap=sm(1.0,1.8,u);
+  drop(x,y,7*(1-vap),0,sm(.35,.9,u)*(1-vap));
+  for(let i=0;i<18;i++){const t0=1.0+rnd(i+200)*.9,a=u-t0;if(a<0||a>1.6)continue;soft(x+Math.sin(a*3+i)*10*a+(rnd(i+201)-.5)*12,y-a*(35+rnd(i+202)*40),2.5+a*3,"235,242,245",.45*(1-a/1.6),true);}
+  soft(x,y,12,"255,246,225",.55*vap,true);soft(x,y,2,"255,255,255",.95*vap,true);}
+function gapY(){return IH*.66+IH*.035;}
+function s6(u){
+  vgrad([[0,"#04060d"],[.45,"#0b1428"],[.64,"#1a2846"],[.7,"#2b3a5a"],[1,"#1b2438"]]);
+  X.drawImage(iStars,0,0,IW,IH*.72);
+  const seaY=lerp(.72,.66,sm(0,1.2,u)),gap=IW*(.05+.27*sm(.2,1.9,u)),br=.5+.5*Math.sin(u*1.5);
+  soft(IW/2,IH*seaY+IH*.035,gap*1.6,"255,232,200",.22+.06*br,true);
+  sea(seaY,1,u,gap);
+  soft(IW/2,IH*seaY+IH*.035,gap*.9,"255,238,210",(.28+.08*br)*sm(.3,1.6,u),true);
+  const p=sm(.15,1.6,u),y=lerp(IH*.4,IH*seaY+IH*.035,p);
+  soft(IW/2,y,12,"255,246,225",.55*(1-sm(1.2,1.7,u)),true);soft(IW/2,y,2,"255,255,255",.95*(1-sm(1.2,1.7,u)),true);}
+const SCN=[s1,s2,s3,s4,s5,s6];
+function iDraw(t){
+  const i=sceneOf(t),u=t-IT.start[i];X=ix;ix.globalAlpha=1;SCN[i](u);
+  if(i>0&&i!==4&&u<.6){                                   // soft hand-over from the previous moment
+    const bx=ibuf.getContext("2d"),d=ibuf.width/IW;bx.setTransform(d,0,0,d,0,0);X=bx;SCN[i-1](IT.start[i]-IT.start[i-1]);X=ix;
+    ix.globalAlpha=1-sm(0,.6,u);ix.drawImage(ibuf,0,0,IW,IH);ix.globalAlpha=1;}
+}
+// ---- words ----
+function iCaption(t){
+  let k=-1;for(let j=0;j<ICAP.length;j++)if(t>=ICAP[j][0]&&t<ICAP[j][1])k=j;
+  if(k===iCapI)return;iCapI=k;
+  if(iCapEl){const o=iCapEl;o.classList.add("out");setTimeout(()=>o.remove(),600);iCapEl=null;}
+  if(k<0)return;const el=document.createElement("div");el.className="icap";
+  [...ICAP[k][ZH?2:3]].forEach((ch,j)=>{const s=document.createElement("span");s.textContent=ch;s.style.animationDelay=(j*(ZH?.06:.018))+"s";el.appendChild(s);});
+  I_.appendChild(el);iCapEl=el;}
+function iTitle(t){I_.classList.toggle("t1",t>=IT.title);I_.classList.toggle("t2",t>=IT.tag);I_.classList.toggle("t3",t>=IT.btn);}
+// ---- sound: the existing beds, plus a live, very low underwater rumble ----
+const IBEDS=["pad_ethereal","rain_soft","snow_hush","stream","reuniverse_hush"];
+function iWant(t){
+  if(iSilent)return{};const i=sceneOf(t),u=t-IT.start[i];
+  if(i===0)return{pad_ethereal:.5};if(i===1)return{rain_soft:.9};if(i===2)return{snow_hush:1};
+  if(i===3)return u<1.6?{stream:.7}:u<3.6?{uw:.9}:{};
+  if(i===4)return u<1.4?(u>.2?{uw:.3}:{}):{reuniverse_hush:1};
+  return{reuniverse_hush:.25};}
+function uw(v){
+  if(!ctx)return;
+  if(!uwG){if(!v)return;const n=ctx.createBuffer(2,ctx.sampleRate*6,ctx.sampleRate);
+    for(let c=0;c<2;c++){const d=n.getChannelData(c);let b=0;for(let i=0;i<d.length;i++){b=(b+.02*(Math.random()*2-1))/1.02;d[i]=b;}
+      for(let i=0,f=ctx.sampleRate;i<f;i++){const w=i/f;d[i]*=w;d[d.length-1-i]*=w;}}   // soft ends, so the loop point is silent
+    const s=ctx.createBufferSource();s.buffer=n;s.loop=true;const f=ctx.createBiquadFilter();f.type="lowpass";f.frequency.value=150;f.Q.value=.5;
+    uwG=ctx.createGain();uwG.gain.value=0;s.connect(f);f.connect(uwG);uwG.connect(master);s.start();uwG.src=s;uwG.v=0;}
+  if(Math.abs(uwG.v-v)>.01){uwG.v=v;fadeTo(uwG,v,1.2);}}
+function iSound(t){
+  if(!ctx)return;setFilter(4);const w=iWant(t);
+  for(const n of IBEDS)setLoop(n,w[n]||0,1.2);uw(w.uw||0);}
+// ---- clock ----
+function iSize(){const d=Math.min(devicePixelRatio||1,1.5);IW=innerWidth;IH=innerHeight;icv.width=IW*d;icv.height=IH*d;ix.setTransform(d,0,0,d,0,0);iPrep();
+  $("iGo").style.top=gapY()+"px";}
+function iShow(t){
+  if(!reduceMotion){iDraw(t);return;}
+  let r=0;for(let k=0;k<IREP.length;k++)if(t>=IREP[k][0])r=k;
+  if(r===iRep)return;const first=iRep<0;iRep=r;
+  const paint=()=>{iDraw(IREP[r][1]);icv.style.opacity=1;};
+  if(first)paint();else{icv.style.opacity=0;setTimeout(paint,450);}}
+function iFrame(now){
+  const t=iNow();
+  if(t<IT.hold+1.5||now-iLast>=33){iShow(t);iLast=now;}   // after the title settles, 30 fps is plenty
+  iCaption(t);iTitle(t);if(now-iTick>200){iTick=now;iSound(t);}
+  iRaf=iOn?requestAnimationFrame(iFrame):0;}
+function playIntro(o){
+  iThen=o.then;iSilent=!!o.hold;introOn=true;iOn=true;iRep=-1;iCapI=-1;if(iCapEl){iCapEl.remove();iCapEl=null;}
+  I_.classList.remove("through","t1","t2","t3","now");I_.classList.toggle("rm",reduceMotion);I_.classList.toggle("en",!ZH);
+  $("iTag").textContent=ZH?"每個念頭，都是一滴回到雲間的水":"Every thought is a drop returning to the clouds.";
+  $("iGo").textContent=ZH?"走進寧靜":"Into the quiet";$("iSkip").textContent=ZH?"略過":"Skip";
+  icv.style.opacity=1;iSize();setT(o.hold?IT.hold:0);if(o.hold)I_.classList.add("now");
+  showOv(I_);ta.blur();if(!iRaf)iRaf=requestAnimationFrame(iFrame);}
+function endIntro(){
+  iOn=false;introOn=false;
+  if(uwG){const g=uwG;uwG=null;fadeTo(g,0,.8);setTimeout(()=>{try{g.src.stop();}catch(e){}g.disconnect();},1200);}
+  if(ctx)for(const n of IBEDS)setLoop(n,0,1);
+  setTimeout(syncAudio,50);}
+I_.addEventListener("click",e=>{                         // tap anywhere: on to the next moment
+  if(e.target.closest("#iGo,#iSkip")||I_.classList.contains("through"))return;
+  const t=iNow(),nx=IT.start.find(s=>s>t+.05);if(nx!==undefined)setT(nx);});
+$("iSkip").onclick=e=>{e.stopPropagation();iSilent=true;if(ctx){for(const n of IBEDS)setLoop(n,0,.6);uw(0);}
+  setT(Math.max(iNow(),IT.hold));I_.classList.add("now");};
+$("iGo").onclick=e=>{
+  e.stopPropagation();unlock();saveTone(.8);iSilent=true;
+  I_.classList.add("through");                            // through the gap in the clouds
+  if(iThen==="onb")setTimeout(startOnb,800);
+  setTimeout(()=>{hideOv(I_,700);setTimeout(endIntro,750);},1300);};
+addEventListener("resize",()=>{if(iOn)iSize();});
+window.__intro={get on(){return iOn},get t(){return Math.round(iNow()*100)/100},get scene(){return sceneOf(iNow())+1},get caption(){return iCapEl?iCapEl.textContent:""}};
+$("reWelcome").onclick=()=>{close();setTimeout(()=>playIntro({hold:true,then:"onb"}),350);};
+$("reIntro").onclick=()=>{close();setTimeout(()=>playIntro({hold:false,then:st.onboarded?"home":"onb"}),350);};
+// the intro plays by itself once, on the very first open; until onboarding is done we come back to its last frame
+if(!st.onboarded){const first=!st.introSeen;st.introSeen=true;persist();playIntro({hold:!first,then:"onb"});}
 updateStarter();
 })();

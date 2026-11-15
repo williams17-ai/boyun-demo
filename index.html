@@ -218,7 +218,32 @@ canvas.kfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
 .oend{position:absolute;left:0;right:0;top:45%;text-align:center;font-size:22px;letter-spacing:.3em;opacity:0;transition:opacity 1s ease;pointer-events:none;text-shadow:0 2px 14px rgba(0,0,0,.6)}
 .oend.on{opacity:1}
 #onb.ending .ostep,#onb.ending .odots,#onb.ending .oskip{opacity:0!important;pointer-events:none}
-@media (prefers-reduced-motion: reduce){.wbg.kb,.wmist{animation:none}.ocard.pic i.rainy::after,.ocard.pic i.snowy::after,.ocard.pic i.sky::before,.ocard.pic i.sky::after{animation:none}}
+#intro{z-index:65;background:#000;cursor:pointer}
+#introCv{position:absolute;inset:0;width:100%;height:100%;transform-origin:50% 70%;transition:transform 1.4s cubic-bezier(.55,0,.8,.35),opacity 1.3s ease,filter 1.3s ease}
+#intro.rm #introCv{transition:opacity .45s ease}
+#intro.through #introCv{transform:scale(2.8);filter:brightness(1.7) blur(5px);opacity:0}
+.icap{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 15vh);text-align:center;padding:0 32px;font-size:15px;font-weight:300;letter-spacing:.16em;line-height:1.9;color:rgba(244,247,242,.9);text-shadow:0 1px 12px rgba(0,0,0,.6);transition:opacity .5s ease;pointer-events:none}
+#intro.en .icap{letter-spacing:.04em}
+.icap.out{opacity:0}
+.icap span{opacity:0;animation:ich .7s ease forwards}
+@keyframes ich{from{opacity:0;filter:blur(3px)}to{opacity:1;filter:none}}
+#intro.rm .icap span{animation:none;opacity:1}
+.ititle{position:absolute;left:0;right:0;top:25vh;text-align:center;pointer-events:none}
+.ititle h1{margin:0;font-size:40px;font-weight:300;letter-spacing:.42em;padding-left:.42em;opacity:0;transition:opacity 1.6s ease;text-shadow:0 2px 20px rgba(0,0,0,.5)}
+.ititle .ien{font-size:12px;letter-spacing:.6em;padding-left:.6em;margin-top:14px;color:rgba(244,247,242,.6);opacity:0;transition:opacity 1.6s ease .4s}
+.ititle .itag{font-size:13px;font-weight:300;letter-spacing:.14em;line-height:1.8;margin:28px 32px 0;color:rgba(244,247,242,.75);opacity:0;transition:opacity 1.4s ease}
+#intro.t1 .ititle h1,#intro.t1 .ien,#intro.t2 .itag{opacity:1}
+.igo{position:absolute;left:50%;transform:translate(-50%,-50%);padding:13px 30px 13px 38px;border-radius:30px;font-size:15px;font-weight:300;letter-spacing:.32em;color:#fff6e4;white-space:nowrap;
+  background:radial-gradient(ellipse at center,rgba(255,236,205,.16),rgba(255,236,205,0) 72%);border:1px solid rgba(255,232,196,.42);
+  box-shadow:0 0 18px rgba(255,226,180,.16),inset 0 0 10px rgba(255,236,205,.08);opacity:0;pointer-events:none;transition:opacity 1.4s ease}
+#intro.en .igo{letter-spacing:.14em;padding:13px 30px}
+#intro.t3 .igo{opacity:1;pointer-events:auto;animation:ibreath 4.2s ease-in-out infinite}
+@keyframes ibreath{0%,100%{box-shadow:0 0 18px rgba(255,226,180,.16),inset 0 0 10px rgba(255,236,205,.08)}50%{box-shadow:0 0 36px rgba(255,226,180,.4),inset 0 0 18px rgba(255,236,205,.22)}}
+.iskip{position:absolute;top:calc(env(safe-area-inset-top) + 14px);right:16px;font-size:13px;letter-spacing:.2em;color:rgba(244,247,242,.42);padding:8px 10px;z-index:2;transition:opacity .6s}
+#intro.t3 .iskip{opacity:0;pointer-events:none}
+#intro.now .ititle h1,#intro.now .ien,#intro.now .itag,#intro.now .igo{transition-duration:.6s;transition-delay:0s}
+#intro.through .ititle,#intro.through .igo,#intro.through .iskip{opacity:0!important;transition:opacity .5s!important;pointer-events:none}
+@media (prefers-reduced-motion: reduce){#intro.t3 .igo{animation:none}.wbg.kb,.wmist{animation:none}.ocard.pic i.rainy::after,.ocard.pic i.snowy::after,.ocard.pic i.sky::before,.ocard.pic i.sky::after{animation:none}}
 </style>
 </head>
 <body>
@@ -269,17 +294,11 @@ canvas.kfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
 <div class="sheet" id="listSheet"><div class="grab"></div><div class="lhead"><h3>我的點子</h3><button id="shareAll">分享全部</button></div><div id="list"></div></div>
 <div class="snack" id="snack"></div>
 
-<div id="welcome" class="ov">
-  <div class="wbg kb" style="background-image:url(a/s1.jpg)"></div>
-  <div class="wmist m1"></div><div class="wmist m2"></div>
-  <div class="wfol"></div>
-  <div class="wshade"></div>
-  <div class="wcontent">
-    <h1>雲間</h1>
-    <p class="wline">有些念頭，說出來就清楚了</p>
-    <p class="wsub">念頭累積，雲就散開</p>
-    <button id="wGo" class="wgo">走進寧靜</button>
-  </div>
+<div id="intro" class="ov">
+  <canvas id="introCv"></canvas>
+  <div class="ititle"><h1>雲間</h1><div class="ien">Kumoma</div><p class="itag" id="iTag"></p></div>
+  <button class="igo" id="iGo">走進寧靜</button>
+  <button class="iskip" id="iSkip">略過</button>
 </div>
 <div id="onb" class="ov">
   <div class="wbg obg" style="background-image:url(a/s1.jpg)"></div><div class="wmist m1"></div><div class="wshade"></div>
@@ -327,6 +346,7 @@ canvas.kfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   <div style="font-size:13px;color:var(--soft);margin-top:12px">看看每一段路</div>
   <div class="chips" id="chips"></div>
   <div class="opt"><div>把寫下的整理成檔案<small>可以放進備忘錄、Notion 或電腦裡</small></div><button class="chip" id="dlAll">存成檔案</button></div>
+  <div class="opt"><div>重看開場<small>再看一次那滴水的旅程</small></div><button class="chip" id="reIntro">播放</button></div>
   <div class="opt"><div>重新走一次<small>再看一次一開始的那片風景</small></div><button class="chip" id="reWelcome">走一次</button></div>
   <div class="opt"><div class="danger">清除所有點子並重來</div><button class="chip danger" id="reset">重設</button></div>
   <div class="ver">雲間 · 你寫下的一切，只留在這支手機裡</div><!-- build v0.7 -->

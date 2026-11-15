@@ -2,8 +2,8 @@
 (function(root){
 const KW={
  business:{
-  zh:["客群","客戶","收費","付費","訂閱","市場","競品","競爭","MVP","商業模式","獲利","營收","用戶","使用者","定價","價格","成本","通路","行銷","品牌","商機","創業","產品","服務","募資","投資","利潤","銷售","業績","變現","痛點","需求","合作","B2B","B2C","商品","App","平台","會員","流量","轉換","方案","報價","提案"],
-  en:["price","pricing","customer","customers","client","revenue","subscription","subscribe","market","competitor","competition","mvp","business model","profit","monetize","monetization","users","user","sales","startup","product","launch","pitch","funding","investor","b2b","b2c","growth","marketing","brand","churn","conversion","pain point","niche","freemium","saas","app","platform","service","margin","cost"]},
+  zh:["客群","客戶","收費","付費","訂閱","市場","競品","競爭","MVP","商業模式","獲利","營收","用戶","使用者","定價","價格","成本","通路","行銷","品牌","商機","創業","產品","服務","募資","投資","利潤","銷售","業績","變現","痛點","需求","合作","B2B","B2C","商品","App","平台","會員","流量","轉換","方案","報價","提案","擺攤","市集","折扣","優惠","開店","小店","生意","接案","顧客","消費者","賣"],
+  en:["price","pricing","customer","customers","client","revenue","subscription","subscribe","market","competitor","competition","mvp","business model","profit","monetize","monetization","users","user","sales","startup","product","launch","pitch","funding","investor","b2b","b2c","growth","marketing","brand","churn","conversion","pain point","niche","freemium","saas","app","platform","service","margin","cost","sell","selling","shop","store","discount","deal","side hustle","freelance"]},
  mood:{
   zh:["覺得","感覺","累","疲憊","開心","快樂","高興","焦慮","緊張","擔心","害怕","難過","沮喪","煩","終於","想通","心情","壓力","放鬆","平靜","感動","感謝","孤單","迷惘","迷茫","委屈","生氣","失落","期待","興奮","安心","療癒","崩潰","撐","哭","笑"],
   en:["feel","feeling","felt","tired","exhausted","happy","glad","anxious","anxiety","worried","nervous","scared","sad","down","stressed","stress","finally","figured out","realized","mood","calm","relaxed","grateful","thankful","lonely","lost","overwhelmed","excited","hopeful","frustrated","angry","burnt out","burned out","cry","peaceful"]}

@@ -75,7 +75,7 @@ const AC=window.AudioContext||window.webkitAudioContext;
 // iOS 17+ (Safari 16.4+): play even when the side switch is on silent. Older browsers just ignore it.
 function setSession(){try{const a=navigator.audioSession;if(a&&a.type!=="playback")a.type="playback";}catch(e){}}
 // loops are loudness-matched (-23 LUFS) in a/v4 — see sfx/synth_v4.py
-const SRC={rain_soft:"v4/rain_soft",stream:"v4/stream",bowl_ambient:"v4/bowl_ambient",pad_ethereal:"v4/pad_ethereal",
+const SRC={rain_soft:"v5/rain_drizzle",stream:"v4/stream",bowl_ambient:"v4/bowl_ambient",pad_ethereal:"v4/pad_ethereal",
   insects_mist:"v4/insects_mist",insects_meadow:"v4/insects_meadow",sfx_save_tone:"v4/sfx_save_tone"};
 // one low-pass over every loop, opening up as the mist clears (Hz per scenery stage; mirrors synth_v4.py)
 const CUTOFF=[1000,1935,3740,7240,14000];

@@ -390,7 +390,7 @@ function setCx(c){
   if(c){ if(c.kind==="manual"){const p=byId(c.parent);label=p?p.t.slice(0,26)+(p.t.length>26?"…":""):"";}
          else label=c.q; }
   $("extTxt").textContent=label;
-  ta.placeholder=c?(c.kind==="manual"?"還想到什麼？慢慢說":"想到什麼就寫什麼，一句也好"):"有什麼點子冒出來了？";
+  ta.placeholder=c?(c.kind==="manual"?"還想到什麼？慢慢說":"想到什麼就寫什麼，一句也好"):"有些念頭，說出來就清楚了";
   updateStarter();
 }
 function setExt(idea){setCx(idea?{kind:"manual",parent:idea.id,q:null,level:(idea.ql||0)+1}:null);if(idea){hideCard();setTimeout(()=>ta.focus(),350);}}
@@ -571,7 +571,7 @@ function transition(from,to){
   if(st.scene!=="reuniverse"){vid.src=`a/t${from+1}${from+2}.mp4`;vid.currentTime=0;vw.classList.add("on");}
   const fin=()=>{if(!vDone)return;vDone=null;clearTimeout(vTimer);shown=to;setBg(to,true);renderTop();syncAudio();
     vw.classList.remove("on");setTimeout(()=>{vid.pause();},500);sfx("sfx_stage_up",.9);
-    busy=false;showCenter(CONGRATS[(st.ideas[0]&&st.ideas[0].lang)==="en"?"en":"zh"][to],STAGES[to],3200);
+    busy=false;showCenter(CONGRATS[(st.ideas[0]&&st.ideas[0].lang)==="en"?"en":"zh"][to],null,3200);   // the stage name is already at the top
     if(pendingFollow){const pf=pendingFollow;pendingFollow=null;setTimeout(()=>showFollow(pf),3500);}else setTimeout(updateStarter,3500);};
   vDone=fin;vTimer=setTimeout(fin,9000);
   if(st.scene==="reuniverse"){sky.rise(from,to,fin);return;}       // no forest film: we rise through the clouds instead

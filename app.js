@@ -1,10 +1,9 @@
 (()=>{
 const $=s=>document.getElementById(s);
 const F=window.Feedback, QN=window.Questions;
-const SUB={zh:["— 誇誇團 —","收進你的森林了","＋1 道光"],en:["— your cheer squad —","Kept safe in your forest","+1 ray of light"]};
+const SUB={zh:["森林替你記住了","收進你的森林了","林子裡又亮了一點"],en:["The forest will remember this","Kept safe in your forest","A little more light in the woods"]};
 const STAGES=["迷霧叢林","林間微光","小徑初現","豁然開朗","柳暗花明"];
 const CONGRATS=["","霧氣散開了，林間透進第一道光","腳下浮現一條小徑，繼續走吧","樹叢後面，是一整片開闊的天空","柳暗花明又一村——你走出來了"];
-const CAT_ZH={business:"商業",mood:"心情",general:"靈感",extension:"延伸"};
 const TH_REAL=[0,5,15,30,50], TH_TEST=[0,1,2,3,4];
 const STREAK_GAP=180000, SUMMARY_IDLE=20000;
 const K="boyun.v1";
@@ -26,6 +25,7 @@ function migrate(s){
     s.ideas.forEach(x=>{const [d,r]=lv(x);x.lvl=d;x.root=r;if(x.q===undefined)x.q=null;});
     if(s.bonus===undefined)s.bonus=0; if(s.follow===undefined)s.follow=true; s.v=3;
   }
+  if(s.v<4){s.ideas.forEach(x=>{if(x.done){x.closed=true;x.bonused=true;delete x.done;}});s.v=4;}
   s.bonus=s.bonus|0; s.follow=s.follow!==false;
   s.test=!!s.test; s.amb=!!s.amb; s.rain=!!s.rain; s.pad=s.pad!==false;
   return s;
@@ -53,8 +53,12 @@ function renderTop(){
   const d=$("dots");d.innerHTML="";
   for(let i=0;i<5;i++){const e=document.createElement("span");e.className="dot"+(i<shown?" done":"")+(i===shown?" cur":"");d.appendChild(e);}
   const n=total(),t=th(),next=t[shown+1];
-  $("stageName").innerHTML=`${STAGES[shown]}<span class="count">${st.ideas.length} 個點子${st.bonus?` · ✦${st.bonus}`:""}${next!==undefined&&stageOf(n)===shown?` · 再 ${next-n} 步看見新風景`:""}</span>`;
-  $("badge").classList.toggle("on",st.test);
+  // no counters — only a poetic hint when the next clearing is near
+  let hint="";
+  if(next===undefined)hint="這裡的風很輕";
+  else if(stageOf(n)===shown){const left=next-n,span=next-t[shown];if(left<=1)hint="前方，好像有光透進來";else if(left<=Math.max(1,Math.ceil(span/3)))hint="前方的霧，好像薄了一點";}
+  $("stageName").innerHTML="";$("stageName").appendChild(document.createTextNode(STAGES[shown]));
+  const hc=document.createElement("span");hc.className="count";hc.textContent=hint;$("stageName").appendChild(hc);
 }
 setBg(shown,true);renderTop();
 
@@ -213,10 +217,10 @@ function setCx(c){
   cx=c;
   $("ext").classList.toggle("on",!!c);
   let label="";
-  if(c){ if(c.kind==="manual"){const p=byId(c.parent);label="↳ 延伸：「"+(p?p.t.slice(0,22)+(p.t.length>22?"…":""):"")+"」";}
-         else label=(c.kind==="starter"?"✎ ":"↳ ")+c.q; }
+  if(c){ if(c.kind==="manual"){const p=byId(c.parent);label=p?p.t.slice(0,26)+(p.t.length>26?"…":""):"";}
+         else label=c.q; }
   $("extTxt").textContent=label;
-  ta.placeholder=c?(c.kind==="manual"?"往下挖一層，還想到什麼？":"想到什麼就寫什麼，一句也好"):"有什麼點子冒出來了？";
+  ta.placeholder=c?(c.kind==="manual"?"還想到什麼？慢慢說":"想到什麼就寫什麼，一句也好"):"有什麼點子冒出來了？";
   updateStarter();
 }
 function setExt(idea){setCx(idea?{kind:"manual",parent:idea.id,q:null}:null);if(idea){hideCard();setTimeout(()=>ta.focus(),350);}}
@@ -231,9 +235,11 @@ const qc=$("qcard");
 function renderCard(){
   if(!card){qc.classList.remove("show","mini");return;}
   const en=card.lang==="en";
-  $("qLabel").textContent=card.minimized?(en?"Keep digging ›":"繼續挖 ›"):card.kind==="starter"?(en?"Prompt":"給你一個題目"):(en?`Follow-up · ${card.level}/4`:`追問 · ${card.level}/4`);
+  $("qLabel").textContent=en?"Say a little more":"還想多說一點";
   $("qText").textContent=card.q;
-  $("qSwap").textContent=en?"Another":"換一題";
+  $("qSwap").setAttribute("aria-label",en?"Think from another angle":"換個方向想");
+  $("qPause").style.display=card.kind==="follow"?"":"none";
+  $("qPause").textContent=en?"Stop here for now":"先到這裡";
   qc.classList.toggle("mini",!!card.minimized);
   requestAnimationFrame(()=>qc.classList.add("show"));
   updateStarter();
@@ -247,10 +253,10 @@ function chainInfo(idea){
   const kw=F.detectCategory(root.t).kw;
   return {root,cat,kw};
 }
-function showFollow(idea){
-  if(!st.follow||!idea||busy||ta.value.trim()||cx)return;
+function showFollow(idea,force){
+  if(!idea||(!force&&(!st.follow||busy||ta.value.trim()||cx)))return;
   const {root,cat,kw}=chainInfo(idea);
-  if(root.done)return;
+  if(root.closed&&!force)return;
   const level=(idea.lvl||0)+1; if(level>QN.MAX_LEVEL)return;
   card={kind:"follow",parent:idea.id,root:root.id,level,lang:idea.lang||"zh",cat,kw:level===1||level===3?kw:null,minimized:false};
   card.q=QN.question(card.lang,cat,level,card.kw);
@@ -272,6 +278,7 @@ function dismissCard(){
 }
 $("qText").onclick=()=>{if(adoptCard())ta.focus();};
 $("qLabel").onclick=()=>{if(card&&card.minimized){card.minimized=false;renderCard();}else if(adoptCard())ta.focus();};
+$("qPause").onclick=e=>{e.stopPropagation();if(!card||card.kind!=="follow")return;const r=card.root;hideCard();closeChain(r,"pause");};
 $("qX").onclick=e=>{e.stopPropagation();dismissCard();};
 $("qSwap").onclick=e=>{e.stopPropagation();if(!card)return;card.q=card.kind==="starter"?QN.starter(card.lang):QN.question(card.lang,card.cat,card.level,card.kw);
   qc.animate([{opacity:.3,transform:"translateY(4px)"},{opacity:1,transform:"none"}],{duration:300});renderCard();};
@@ -297,15 +304,19 @@ function glow(){
   g.animate([{transform:"translate(-50%,-50%) scale(.2)",opacity:0},{transform:"translate(-50%,-50%) scale(1)",opacity:1,offset:.3},{transform:"translate(-50%,-50%) scale(2.6)",opacity:0}],{duration:2600,easing:"ease-out"}).onfinish=()=>g.remove();
   $("dots").animate([{filter:"drop-shadow(0 0 0 #ffe9b0)"},{filter:"drop-shadow(0 0 8px #ffe9b0)"},{filter:"drop-shadow(0 0 0 #ffe9b0)"}],{duration:2200});
 }
-function closeChain(rid){
-  const r=byId(rid);if(!r||r.done)return;
-  const before=stageOf(total());r.done=true;st.bonus++;persist();
-  const lang=(st.ideas.find(x=>x.root===rid&&x.lvl>0)||r).lang||"zh";
-  glow();sfx("sfx_idea_saved",.6);
-  showCenter(QN.closure(lang),lang==="en"?"✦ Path complete · +1 progress":"✦ 這條路完成了 · 進度 +1",3200);
+function closeChain(rid,kind){
+  const r=byId(rid);if(!r||r.closed)return;
+  const ans=answersOf(rid),lang=(ans[0]||r).lang||"zh";
+  const line=kind==="pause"?QN.pause(lang):QN.closure(lang);
+  if(!ans.length){showCenter(line,null,2800);return;}   // nothing written yet: just a gentle line
+  const before=stageOf(total());
+  r.closed=true;r.paused=kind==="pause";
+  if(!r.bonused){r.bonused=true;st.bonus++;}
+  persist();glow();sfx("sfx_idea_saved",.6);
+  showCenter(line,null,3200);
   renderTop();
   const after=stageOf(total());
-  if(after>before){busy=true;setTimeout(()=>transition(after-1,after),3400);}
+  if(after>before)setTimeout(function go(){if(busy){setTimeout(go,800);return;}transition(after-1,after);},3400); // don't block typing while the line shows
 }
 
 // streak (root saves only, follow-up answers don't count)
@@ -379,7 +390,7 @@ function transition(from,to){
   vw.classList.add("on");
   const fin=()=>{if(!vDone)return;vDone=null;clearTimeout(vTimer);shown=to;setBg(to,true);renderTop();syncAudio();
     vw.classList.remove("on");setTimeout(()=>{vid.pause();},500);sfx("sfx_stage_up",.9);
-    busy=false;showCenter(CONGRATS[to],`第 ${to+1} 階段 · ${STAGES[to]}`,3200);
+    busy=false;showCenter(CONGRATS[to],STAGES[to],3200);
     if(pendingFollow){const pf=pendingFollow;pendingFollow=null;setTimeout(()=>showFollow(pf),3500);}else setTimeout(updateStarter,3500);};
   vDone=fin;vid.onended=fin;vTimer=setTimeout(fin,9000);
   const pr=vid.play();if(pr)pr.catch(()=>setTimeout(fin,600));
@@ -402,30 +413,102 @@ function close(){if(openS)openS.classList.remove("on");veil.classList.remove("on
 veil.onclick=close;
 document.querySelectorAll(".sheet").forEach(s=>{let y0=null;s.addEventListener("touchstart",e=>{if(s.scrollTop<=0)y0=e.touches[0].clientY;},{passive:true});s.addEventListener("touchend",e=>{if(y0!==null&&e.changedTouches[0].clientY-y0>80)close();y0=null;});});
 function fmt(at){const d=new Date(at);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;}
+// ---------- list: groups, pin, delete, resume, export ----------
+const descendants=rid=>{const out=[];const walk=id=>{st.ideas.filter(x=>x.p===id).sort((a,b)=>a.at-b.at).forEach(k=>{out.push(k);walk(k.id);});};walk(rid);return out;};
+const answersOf=rid=>st.ideas.filter(x=>x.root===rid&&x.id!==rid);
+function snack(msg){const n=$("snack");n.textContent=msg;n.classList.add("show");clearTimeout(snack.t);snack.t=setTimeout(()=>n.classList.remove("show"),2200);}
+function fmtDay(at){const d=new Date(at);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;}
+function chainText(r,md){
+  const en=r.lang==="en",ds=descendants(r.id),L=[];
+  if(r.q)L.push(md?`*${r.q}*`:r.q);
+  L.push((md?"## ":"")+"💡 "+r.t);L.push("");
+  for(const n of ds){if(n.q)L.push(md?`> ${n.q}`:"— "+n.q);L.push(md?n.t:"   "+n.t);L.push("");}
+  const step=ds.filter(n=>n.lvl===4).pop();
+  if(step)L.push((md?"**":"")+(en?"👣 Next step: ":"👣 下一步：")+step.t+(md?"**":""));
+  L.push((md?"_":"")+fmtDay(r.at)+(md?"_":""));
+  return L.join("\n").replace(/\n{3,}/g,"\n\n");
+}
+function allText(md){
+  const roots=sortedRoots();
+  return (md?"# ":"")+"撥雲見日 · 我的點子\n"+fmtDay(Date.now())+"\n\n"+roots.map(r=>chainText(r,md)).join(md?"\n\n---\n\n":"\n\n———\n\n")+"\n";
+}
+function copyText(t){
+  const ok=()=>snack("已複製，可以貼到任何地方");
+  if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t).then(ok).catch(()=>legacyCopy(t,ok));
+  legacyCopy(t,ok);
+}
+function legacyCopy(t,ok){const a=document.createElement("textarea");a.value=t;a.setAttribute("readonly","");a.style.cssText="position:fixed;opacity:0";document.body.appendChild(a);a.select();try{document.execCommand("copy");ok();}catch(e){snack("請長按選取後複製");}a.remove();}
+function shareText(title,t){
+  if(navigator.share){navigator.share({title,text:t}).catch(e=>{if(e&&e.name!=="AbortError")copyText(t);});}
+  else copyText(t);
+}
+function download(name,t){
+  const b=new Blob([t],{type:"text/markdown;charset=utf-8"}),u=URL.createObjectURL(b),a=document.createElement("a");
+  a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),3000);snack("已存成檔案");
+}
+$("shareAll").onclick=()=>{if(!st.ideas.length)return snack("還沒有點子可以分享");shareText("撥雲見日",allText(false));};
+$("dlAll").onclick=()=>{if(!st.ideas.length)return snack("還沒有點子可以存");const d=new Date();download(`撥雲見日-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}.md`,allText(true));};
+function removeIdea(x){
+  const isRoot=!x.p||!byId(x.p);
+  const msg=isRoot?"確定刪掉這個點子，和後面接著想的內容嗎？":"確定刪掉這段嗎？後面接著寫的也會一起刪掉。";
+  if(!confirm(msg))return;
+  const gone=new Set([x.id,...descendants(x.id).map(n=>n.id)]);
+  st.ideas=st.ideas.filter(n=>!gone.has(n.id));persist();
+  if(card&&(gone.has(card.parent)||gone.has(card.root)))hideCard();
+  if(cx&&gone.has(cx.parent))setCx(null);
+  renderList();renderTop();snack("刪掉了");
+}
+function resumeChain(r){
+  const ds=answersOf(r.id);
+  const deepest=[r,...ds].sort((a,b)=>(b.lvl||0)-(a.lvl||0)||b.at-a.at)[0];
+  close();
+  if((deepest.lvl||0)>=QN.MAX_LEVEL){setExt(deepest);return;}
+  r.closed=false;r.paused=false;persist();
+  setCx(null);delete dismissed[r.id];
+  setTimeout(()=>showFollow(deepest,true),380);
+}
+const walkedOut=r=>r.closed&&answersOf(r.id).length>0;
+function sortedRoots(){
+  const ids=new Set(st.ideas.map(x=>x.id));
+  return st.ideas.filter(x=>!x.p||!ids.has(x.p)).sort((a,b)=>(b.pin?1:0)-(a.pin?1:0)||b.at-a.at);
+}
+const PIN_SVG='<svg class="pin" viewBox="0 0 24 24"><path d="M14 3l7 7-3 1-4 4 1 5-2 1-4-5-5 5-1-1 5-5-5-4 1-2 5 1 4-4z"/></svg>';
 function renderList(){
   const L=$("list");L.innerHTML="";
   if(!st.ideas.length){L.innerHTML='<div class="empty">還沒有點子，寫下第一個吧</div>';return;}
-  const ids=new Set(st.ideas.map(x=>x.id)),kids={};
-  for(const x of st.ideas)if(x.p&&ids.has(x.p))(kids[x.p]=kids[x.p]||[]).push(x);
-  const roots=st.ideas.filter(x=>!x.p||!ids.has(x.p));
-  const row=(x,depth)=>{
-    const d=document.createElement("div");d.className="item"+(depth?" child":"")+(x.done?" done":"");if(depth)d.style.setProperty("--ind",(Math.min(depth,3)*12)+"px");
+  const roots=sortedRoots();
+  const groups=[["還在想",roots.filter(r=>!walkedOut(r))],["已走出來",roots.filter(walkedOut)]];
+  const row=(x,depth,root)=>{
+    const d=document.createElement("div");d.className="item"+(depth?" child":"")+(!depth&&walkedOut(x)?" done":"");if(depth)d.style.setProperty("--ind",(Math.min(depth,3)*12)+"px");
     const m=document.createElement("div");m.className="meta";
+    if(!depth){const tg=document.createElement("span");tg.className="cdot "+(x.cat||"general");tg.setAttribute("aria-hidden","true");m.appendChild(tg);}
     const tm=document.createElement("time");tm.textContent=fmt(x.at);m.appendChild(tm);
-    const tg=document.createElement("span");tg.className="tag "+(x.cat||"general");tg.textContent=CAT_ZH[x.cat]||"靈感";m.appendChild(tg);
-    if(x.done){const dn=document.createElement("span");dn.className="tag donetag";dn.textContent="✦ 完成的路";m.appendChild(dn);}
-    const eb=document.createElement("button");eb.className="extbtn";eb.textContent="延伸";eb.onclick=()=>{close();setExt(x);};m.appendChild(eb);
+    if(!depth&&x.pin){const pi=document.createElement("span");pi.innerHTML=PIN_SVG;pi.style.display="inline-flex";m.appendChild(pi);}
+    if(!depth){const eb=document.createElement("button");eb.className="extbtn";eb.textContent="接著想";eb.onclick=()=>resumeChain(x);m.appendChild(eb);}
+    const mo=document.createElement("button");mo.className="more";mo.textContent="⋯";mo.setAttribute("aria-label","更多");m.appendChild(mo);
     d.appendChild(m);
     if(x.q){const q=document.createElement("div");q.className="qline";q.textContent=x.q;d.appendChild(q);}
-    d.appendChild(document.createTextNode(x.t));L.appendChild(d);
-    (kids[x.id]||[]).slice().sort((a,b)=>a.at-b.at).forEach(k=>row(k,depth+1));
+    d.appendChild(document.createTextNode(x.t));
+    const acts=document.createElement("div");acts.className="acts";
+    const mk=(txt,fn,cls)=>{const b=document.createElement("button");b.textContent=txt;if(cls)b.className=cls;b.onclick=fn;acts.appendChild(b);};
+    if(!depth){mk(x.pin?"取消置頂":"置頂",()=>{x.pin=!x.pin;persist();renderList();});
+               mk("分享",()=>shareText("撥雲見日",chainText(x,false)));}
+    mk("刪除",()=>removeIdea(x),"del");
+    d.appendChild(acts);
+    mo.onclick=()=>acts.classList.toggle("on");
+    L.appendChild(d);
+    st.ideas.filter(k=>k.p===x.id).sort((a,b)=>a.at-b.at).forEach(k=>row(k,depth+1,root));
   };
-  roots.forEach(x=>row(x,0));
+  for(const [name,rs] of groups){
+    if(!rs.length)continue;
+    const h=document.createElement("div");h.className="ghead";h.textContent=name;L.appendChild(h);
+    rs.forEach(r=>row(r,0,r));
+  }
 }
 $("btnList").onclick=()=>{renderList();open($("listSheet"));};
 $("btnSet").onclick=()=>{syncAudio();open($("setSheet"));};
-const chips=$("chips");for(let i=0;i<4;i++){const b=document.createElement("button");b.className="chip";b.textContent=`▶ ${i+1}→${i+2}`;b.onclick=()=>{unlock();close();setBg(i,true);shown=i;renderTop();setTimeout(()=>transition(i,i+1),400);};chips.appendChild(b);}
-const back0=document.createElement("button");back0.className="chip";back0.textContent="回到目前進度";back0.onclick=()=>{shown=stageOf(total());setBg(shown);renderTop();syncAudio();close();};chips.appendChild(back0);
+const chips=$("chips");for(let i=0;i<4;i++){const b=document.createElement("button");b.className="chip";b.textContent=`▶ ${STAGES[i+1]}`;b.onclick=()=>{unlock();close();setBg(i,true);shown=i;renderTop();setTimeout(()=>transition(i,i+1),400);};chips.appendChild(b);}
+const back0=document.createElement("button");back0.className="chip";back0.textContent="回到我現在的位置";back0.onclick=()=>{shown=stageOf(total());setBg(shown);renderTop();syncAudio();close();};chips.appendChild(back0);
 $("reset").onclick=()=>{if(!confirm("確定要清除所有點子嗎？"))return;st.ideas=[];st.bonus=0;streak=0;hideCard();setCx(null);persist();shown=0;setBg(0);renderTop();syncAudio();close();};
 updateStarter();
 })();

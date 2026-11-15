@@ -82,8 +82,6 @@ textarea::placeholder{color:rgba(255,255,255,.6)}
 .chip{padding:8px 12px;border-radius:16px;background:rgba(255,255,255,.12);font-size:13px}
 .danger{color:#ff9c9c}
 .ver{font-size:11px;color:var(--soft);text-align:center;margin-top:14px}
-.badge{position:absolute;top:calc(env(safe-area-inset-top) + 54px);right:14px;font-size:10px;padding:3px 8px;border-radius:10px;background:rgba(201,169,79,.8);color:#1d1a0f;z-index:5;display:none}
-.badge.on{display:block}
 
 .bg{transition:opacity 1.6s ease,filter 2s ease}
 #app.raining .bg{filter:brightness(.78) saturate(.62) blur(2px)}
@@ -98,31 +96,49 @@ canvas.fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 .toast b{color:var(--gold);font-weight:600;display:block;font-size:13px;letter-spacing:.08em}
 .ext{display:none;align-items:center;gap:8px;font-size:12px;color:var(--gold);margin-bottom:6px}
 .ext.on{display:flex}
-.ext span{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ext span{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-style:italic;color:rgba(255,233,176,.8)}
 .ext button{font-size:14px;opacity:.8;padding:0 4px}
 .item .meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--soft);margin-bottom:3px}
 .item .meta time{margin:0}
-.item .tag{padding:1px 7px;border-radius:8px;background:rgba(255,255,255,.1);font-size:10px}
-.item .tag.business{background:rgba(201,169,79,.35)}.item .tag.mood{background:rgba(140,170,220,.3)}.item .tag.extension{background:rgba(140,200,160,.3)}
+.cdot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.35);flex:none}
+.cdot.business{background:#d8b860}.cdot.mood{background:#9db4e0}.cdot.general{background:#a9d4b4}
 .item .extbtn{margin-left:auto;font-size:12px;color:var(--gold);padding:2px 8px;border-radius:10px;background:rgba(201,169,79,.15)}
+.item .more{font-size:15px;color:var(--soft);padding:0 6px;letter-spacing:.1em}
+.item .extbtn+.more{margin-left:0}.item .meta .more:first-of-type{margin-left:auto}
+.pin{width:11px;height:11px;fill:var(--gold);opacity:.8}
+.acts{display:none;gap:8px;margin:6px 0 2px}
+.acts.on{display:flex}
+.acts button{font-size:12px;padding:5px 12px;border-radius:12px;background:rgba(255,255,255,.1)}
+.acts .del{color:#ff9c9c}
+.ghead{font-size:12px;color:var(--soft);letter-spacing:.2em;margin:16px 0 2px}
+.ghead:first-child{margin-top:0}
+.lhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.lhead h3{margin:0;flex:1}
+.lhead button{font-size:12px;color:var(--gold);padding:5px 10px;border-radius:12px;background:rgba(201,169,79,.14)}
+.snack{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 30px);transform:translate(-50%,10px);z-index:40;padding:9px 16px;border-radius:16px;background:rgba(20,28,24,.9);font-size:13px;opacity:0;transition:all .35s;pointer-events:none}
+.snack.show{opacity:1;transform:translate(-50%,0)}
 .item.child{border-left:2px solid rgba(201,169,79,.35);padding-left:12px;margin-left:var(--ind,12px);border-bottom:0;padding-top:8px;padding-bottom:8px}
 
-.qcard{margin:0 4px 10px;padding:12px 14px 12px;border-radius:18px;background:rgba(255,248,230,.14);border:1px solid rgba(255,233,176,.28);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 8px 30px rgba(0,0,0,.2);opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s;pointer-events:none;display:none}
-.qcard.show{display:block;opacity:1;transform:none;pointer-events:auto;animation:qin .5s ease}
+.qcard{margin:0 4px 10px;padding:12px 12px 8px 14px;border-radius:18px;background:rgba(255,248,230,.13);border:1px solid rgba(255,233,176,.24);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 8px 30px rgba(0,0,0,.2);opacity:0;transform:translateY(10px);transition:opacity .5s,transform .5s;pointer-events:none;display:none;align-items:center;flex-wrap:wrap;gap:4px}
+.qcard.show{display:flex;opacity:1;transform:none;pointer-events:auto;animation:qin .5s ease}
 @keyframes qin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.qhead{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.12em;color:var(--gold)}
-.qhead span{flex:1;cursor:pointer}
-.qhead button{font-size:12px;color:var(--soft);padding:2px 6px}
-.qtext{font-size:16px;line-height:1.55;margin-top:6px;cursor:pointer}
-.qcard.mini{display:inline-block;padding:6px 10px;border-radius:14px;margin-left:8px}
-.qcard.mini .qtext,.qcard.mini #qSwap{display:none}
+.qtext{flex:1 1 100%;font-size:16px;line-height:1.55;font-style:italic;letter-spacing:.02em;cursor:pointer;padding-bottom:2px}
+.qbtn{width:30px;height:30px;display:grid;place-items:center;color:var(--soft);font-size:13px;border-radius:50%}
+.qbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.qpause{margin-right:auto;font-size:12px;color:rgba(255,233,176,.85);padding:4px 2px;letter-spacing:.06em}
+.qdot,.qmini{display:none}
+.qdot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold);animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.4}}
+.qmini{font-size:12px;color:var(--soft);cursor:pointer;padding:0 4px}
+.qcard.mini{display:inline-flex;padding:4px 6px 4px 12px;border-radius:16px;margin-left:8px;gap:6px}
+.qcard.mini .qtext,.qcard.mini #qSwap,.qcard.mini .qpause{display:none}
+.qcard.mini .qdot,.qcard.mini .qmini{display:inline-block}
 .starter{font-size:12px;color:var(--gold);letter-spacing:.08em;padding:4px 10px;border-radius:12px;background:rgba(201,169,79,.16);display:none}
 .starter.show{display:inline-block;animation:qin .6s ease}
 .hint.hide{display:none}
 .glowring{position:fixed;left:50%;top:40%;width:260px;height:260px;border-radius:50%;z-index:6;pointer-events:none;background:radial-gradient(circle,rgba(255,240,190,.55),rgba(255,226,140,.18) 45%,transparent 70%)}
 .item .qline{font-size:12px;color:rgba(244,247,242,.5);margin-bottom:2px}
-.item.done{box-shadow:inset 3px 0 0 rgba(255,233,176,.8);padding-left:10px}
-.item .tag.donetag{background:rgba(255,233,176,.3);color:var(--gold)}
+.item.done{box-shadow:inset 3px 0 0 rgba(255,233,176,.55);padding-left:10px}
 </style>
 </head>
 <body>
@@ -138,24 +154,23 @@ canvas.fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
     <button class="icon" id="btnList" aria-label="點子清單"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></svg></button>
     <div class="dots" id="dots"></div>
     <div style="display:flex;gap:8px">
-      <button class="icon" id="btnRain" aria-label="雨聲模式"><svg viewBox="0 0 24 24"><path d="M7 15a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 8a3.5 3.5 0 0 1 .5 7H7z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/></svg></button>
-      <button class="icon" id="btnSound" aria-label="環境音"><svg viewBox="0 0 24 24" id="sndIcon"></svg></button>
+      <button class="icon" id="btnRain" aria-label="下雨"><svg viewBox="0 0 24 24"><path d="M7 15a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 8a3.5 3.5 0 0 1 .5 7H7z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/></svg></button>
+      <button class="icon" id="btnSound" aria-label="森林的聲音"><svg viewBox="0 0 24 24" id="sndIcon"></svg></button>
       <button class="icon" id="btnSet" aria-label="設定"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>
     </div>
   </div>
-  <div class="badge" id="badge">測試模式</div>
   <div class="stage-name" id="stageName"></div>
 
   <div class="praise" id="praise"></div>
   <div class="toast" id="toast"></div>
 
   <div class="composer" id="composer">
-    <div class="qcard" id="qcard"><div class="qhead"><span id="qLabel">追問</span><button id="qSwap">換一題</button><button id="qX" aria-label="關閉">✕</button></div><div class="qtext" id="qText"></div></div>
+    <div class="qcard" id="qcard"><span class="qdot"></span><div class="qtext" id="qText"></div><span class="qmini" id="qLabel">還想多說一點</span><button class="qpause" id="qPause">先到這裡</button><button class="qbtn" id="qSwap" aria-label="換個方向想"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg></button><button class="qbtn" id="qX" aria-label="先不用">✕</button></div>
     <div class="card" id="card">
-      <div class="ext" id="ext"><span id="extTxt"></span><button id="extX" aria-label="取消延伸">✕</button></div>
+      <div class="ext" id="ext"><span id="extTxt"></span><button id="extX" aria-label="放下這個問題">✕</button></div>
       <textarea id="ta" placeholder="有什麼點子冒出來了？" autofocus enterkeyhint="done"></textarea>
       <div class="row">
-        <span><span class="hint" id="hint">寫完往上滑，或點 ↑ 收下</span><button class="starter" id="starter">✦ 給我一個題目</button></span>
+        <span><span class="hint" id="hint">寫好了，往上輕推就收下</span><button class="starter" id="starter">不知道寫什麼？</button></span>
         <div class="btns">
           <button class="mic" id="mic" aria-label="語音輸入" hidden><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
           <button class="save" id="save" aria-label="收下點子" disabled><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
@@ -168,17 +183,18 @@ canvas.fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;o
 <div id="vwrap"><video id="vid" muted playsinline webkit-playsinline preload="auto"></video><button id="skip">略過 ›</button></div>
 
 <div class="veil" id="veil"></div>
-<div class="sheet" id="listSheet"><div class="grab"></div><h3>我的點子</h3><div id="list"></div></div>
+<div class="sheet" id="listSheet"><div class="grab"></div><div class="lhead"><h3>我的點子</h3><button id="shareAll">分享全部</button><button id="dlAll">存成檔案</button></div><div id="list"></div></div>
+<div class="snack" id="snack"></div>
 <div class="sheet" id="setSheet"><div class="grab"></div><h3>設定</h3>
-  <div class="opt"><div>森林環境音<small>第 1–3 階段叢林、4–5 階段草原</small></div><button class="sw" id="swAmb"></button></div>
-  <div class="opt"><div>雨聲模式 🌧<small>層次雨聲＋下雨特效，關掉會慢慢放晴</small></div><button class="sw" id="swRain"></button></div>
-  <div class="opt"><div>空靈音墊<small>低沉柔和的冥想底音，可疊在雨聲下</small></div><button class="sw" id="swPad"></button></div>
-  <div class="opt"><div>追問模式<small>收下點子後，輕輕問你一個延伸問題（最多 4 層）</small></div><button class="sw" id="swFollow"></button></div>
-  <div class="opt"><div>測試模式<small>門檻改成 1／2／3／4 個點子，快速看完 5 個階段</small></div><button class="sw" id="swTest"></button></div>
-  <div style="font-size:13px;color:var(--soft);margin-top:12px">直接預覽轉場</div>
+  <div class="opt"><div>森林的聲音<small>叢林裡的蟲鳴，走出去後是草原的風</small></div><button class="sw" id="swAmb"></button></div>
+  <div class="opt"><div>下一場雨 🌧<small>雨聲和窗上的雨滴，關掉會慢慢放晴</small></div><button class="sw" id="swRain"></button></div>
+  <div class="opt"><div>遠方的低吟<small>很輕的底音，陪你靜下來</small></div><button class="sw" id="swPad"></button></div>
+  <div class="opt"><div>寫完後陪我多想一點<small>輕輕問你一句，想停隨時可以停</small></div><button class="sw" id="swFollow"></button></div>
+  <div class="opt"><div>快速預覽場景<small>只要寫幾句，就能走過每一段風景（展示用）</small></div><button class="sw" id="swTest"></button></div>
+  <div style="font-size:13px;color:var(--soft);margin-top:12px">看看每一段路</div>
   <div class="chips" id="chips"></div>
   <div class="opt"><div class="danger">清除所有點子並重來</div><button class="chip danger" id="reset">重設</button></div>
-  <div class="ver">撥雲見日 · Demo v0.3 · 資料只存在這支手機</div>
+  <div class="ver">撥雲見日 · 你寫下的一切，只留在這支手機裡</div><!-- build v0.4 -->
 </div>
 
 <script src="feedback.js"></script>

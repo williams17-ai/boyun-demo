@@ -41,7 +41,8 @@ const KQ={
 const STARTERS={
  zh:["今天最煩的一件事是什麼？","如果有個 app 幫你做一件事，你希望是什麼？","最近讓你眼睛一亮的東西？","這週有什麼讓你會心一笑的瞬間？","你最常跟朋友抱怨的是什麼？","有什麼事你做了很多次，覺得應該更簡單？","最近一次覺得「如果有人做這個就好了」是什麼時候？","工作上最浪費時間的是哪件事？","你想送給十年前的自己什麼？","如果明天放假一天，你最想做什麼？","身邊誰最近很辛苦？你能幫他什麼？","有什麼小習慣，你一直想開始？","最近學到最有趣的一件事？","你最想被誰誇獎？為什麼？","通勤路上，你都在想什麼？","你家裡哪個東西最不好用？","如果你開一家小店，會賣什麼？","最近讓你感動的一句話？","客戶最常問你的問題是什麼？","你覺得自己最被低估的能力是？","有什麼東西你願意每個月付錢訂閱？","今天想對自己說聲謝謝的理由？","最近一次失眠，在想什麼？","有什麼事你很想做，但一直沒開始？","如果只能改變生活中的一件小事，會是什麼？"],
  en:["What annoyed you most today?","If an app could do one thing for you, what would it be?","What caught your eye recently?","What made you smile this week?","What do you complain about most with friends?","What do you do over and over that should be easier?","When did you last think “someone should build this”?","What wastes the most time at work?","What would you tell yourself ten years ago?","If you had tomorrow off, what would you do?","Who around you is struggling? How could you help?","What small habit do you keep meaning to start?","What's the most interesting thing you learned lately?","What would you happily pay for every month?","What's one small thing you'd change in your daily life?"]};
-const CLOSURE={zh:["你把一個念頭挖成一條路了","從一個點子走到一個行動，好厲害","這條線完整了，霧散得更開了"],en:["You turned one thought into a path.","From a spark to a first step — amazing.","This thread is complete. The mist just lifted more."]};
+const CLOSURE={zh:["你把一個念頭走成了一條路","從一個點子走到一個行動，好厲害","這條線走完了，霧又散開了一些"],en:["You turned one thought into a path.","From a spark to a first step — amazing.","You followed this thread all the way. The mist lifted a little."]};
+const PAUSE={zh:["先把這片霧記下來，改天再走","走到這裡也很好，路會等你","先停在這裡吧，風景不會跑掉"],en:["Let's leave the mist here for now. We'll walk again another day.","This is a lovely place to rest. The path will wait.","Pause here — the view isn't going anywhere."]};
 const recent=[];
 function pick(arr){let i,t=0;do{i=Math.floor(Math.random()*arr.length);t++;}while(recent.includes(arr[i])&&t<8);recent.push(arr[i]);if(recent.length>12)recent.shift();return arr[i];}
 function question(lang,cat,level,kw){
@@ -51,7 +52,8 @@ function question(lang,cat,level,kw){
   return pick(Q[lang][cat][level]);
 }
 function starter(lang){return pick(STARTERS[lang==="en"?"en":"zh"]);}
+function pause(lang){return pick(PAUSE[lang==="en"?"en":"zh"]);}
 function closure(lang){return pick(CLOSURE[lang==="en"?"en":"zh"]);}
-const api={question,starter,closure,Q,STARTERS,MAX_LEVEL:4};
+const api={question,starter,closure,pause,Q,STARTERS,MAX_LEVEL:4};
 if(typeof module!=="undefined"&&module.exports)module.exports=api;else root.Questions=api;
 })(this);

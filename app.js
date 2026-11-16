@@ -80,7 +80,8 @@ const AC=window.AudioContext||window.webkitAudioContext;
 function setSession(){try{const a=navigator.audioSession;if(a&&a.type!=="playback")a.type="playback";}catch(e){}}
 // loops are loudness-matched (-23 LUFS) in a/v4 — see sfx/synth_v4.py
 const SRC={rain_soft:"v5/rain_drizzle",stream:"v4/stream",bowl_ambient:"v4/bowl_ambient",pad_ethereal:"v4/pad_ethereal",
-  insects_mist:"v4/insects_mist",snow_hush:"v5/snow_hush",reuniverse_hush:"v5/reuniverse_hush",insects_meadow:"v4/insects_meadow",sfx_save_tone:"v4/sfx_save_tone"};
+  insects_mist:"v4/insects_mist",snow_hush:"v5/snow_hush",reuniverse_hush:"v5/reuniverse_hush",insects_meadow:"v4/insects_meadow",sfx_save_tone:"v4/sfx_save_tone",
+  intro_score:"v6/intro_score",intro_hold:"v6/intro_hold",intro_breath:"v6/intro_breath"};
 // one low-pass over every loop, opening up as the mist clears (Hz per scenery stage; mirrors synth_v4.py)
 const CUTOFF=[1000,1935,3740,7240,14000];
 // make-up gain (dB) for loops with a lot of top end, so opening the filter brightens rather than just gets louder
@@ -746,11 +747,16 @@ const ICAP=[[.3,2.3,"雲裡，有什麼正在凝聚","In the clouds, something b
   [12.6,16.4,"遇光而升，穿過雲間，觸到星空的靜","Meeting the light, it rises through the clouds and touches the silence of the stars."]];
 // reduced motion: one still per moment, cross-faded (segment start -> the instant shown)
 const IREP=[[0,1.9],[2.4,3.6],[4.8,5.9],[7.2,8.5],[9.25,10.2],[11.2,11.7],[12.2,15.3],[16.6,99]];
-let X=ix,IW=0,IH=0,iRaf=0,iBase=0,iAt=0,iOn=false,iThen="onb",iSilent=false,iCapI=-1,iCapEl=null,iRep=-1,iTick=0,iLast=0,iRock=null,iStars=null,iRidge=null,uwG=null;
+let X=ix,IW=0,IH=0,iRaf=0,iBase=0,iAt=0,iOn=false,iThen="onb",iSilent=false,iCapI=-1,iCapEl=null,iRep=-1,iTick=0,iLast=0,iRock=null,iStars=null,iRidge=null;
 var introOn=false;
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)),sm=(a,b,v)=>{const x=clamp((v-a)/(b-a));return x*x*(3-2*x);};
 const rnd=i=>{const s=Math.sin(i*127.1+311.7)*43758.5453;return s-Math.floor(s);};
-const iNow=()=>iBase+(performance.now()-iAt)/1000,setT=t=>{iBase=t;iAt=performance.now();};
+const iNow=()=>iFroze!==null?iFroze:iBase+(performance.now()-iAt)/1000,setT=t=>{iBase=t;iAt=performance.now();};
+// WebGL renderer (intro-gl.js) when the device can do it; otherwise the 2D canvas version below. ?gl=off / ?gl=force for testing.
+const igc=$("introGl"),GLQ=new URLSearchParams(location.search).get("gl");
+let iGL=null,iC=icv,iFroze=null,iDt=0,iDtN=0,iPrev=0;
+function glFallback(){iGL=false;iC=icv;igc.style.display="none";icv.style.display="";icv.style.opacity=1;iRep=-1;}
+function iPaint(t){if(iGL){if(!iGL.draw(t)){glFallback();iDraw(t);}}else iDraw(t);}
 const sceneOf=t=>{let i=0;for(let k=0;k<6;k++)if(t>=IT.start[k])i=k;return i;};
 // ---- painting helpers (draw into X, which is the screen or the cross-fade buffer) ----
 function vgrad(stops,y0=0,y1=IH){const a=Math.max(0,y0),b=Math.min(IH,y1);if(b<=a)return;const g=X.createLinearGradient(0,y0,0,y1);for(const[p,c]of stops)g.addColorStop(p,c);X.fillStyle=g;X.fillRect(0,a,IW,b-a);}
@@ -886,56 +892,68 @@ function iCaption(t){
   if(k<0)return;const el=document.createElement("div");el.className="icap";
   [...ICAP[k][ZH?2:3]].forEach((ch,j)=>{const s=document.createElement("span");s.textContent=ch;s.style.animationDelay=(j*(ZH?.06:.018))+"s";el.appendChild(s);});
   I_.appendChild(el);iCapEl=el;}
-function iTitle(t){I_.classList.toggle("t1",t>=IT.title);I_.classList.toggle("t2",t>=IT.tag);I_.classList.toggle("t3",t>=IT.btn);}
-// ---- sound: the existing beds, plus a live, very low underwater rumble ----
-const IBEDS=["pad_ethereal","rain_soft","snow_hush","stream","reuniverse_hush"];
-function iWant(t){
-  if(iSilent)return{};const i=sceneOf(t),u=t-IT.start[i];
-  if(i===0)return{pad_ethereal:.5};if(i===1)return{rain_soft:.9};if(i===2)return{snow_hush:1};
-  if(i===3)return u<1.6?{stream:.7}:u<3.6?{uw:.9}:{};
-  if(i===4)return u<1.4?(u>.2?{uw:.3}:{}):{reuniverse_hush:1};
-  return{reuniverse_hush:.25};}
-function uw(v){
-  if(!ctx)return;
-  if(!uwG){if(!v)return;const n=ctx.createBuffer(2,ctx.sampleRate*6,ctx.sampleRate);
-    for(let c=0;c<2;c++){const d=n.getChannelData(c);let b=0;for(let i=0;i<d.length;i++){b=(b+.02*(Math.random()*2-1))/1.02;d[i]=b;}
-      for(let i=0,f=ctx.sampleRate;i<f;i++){const w=i/f;d[i]*=w;d[d.length-1-i]*=w;}}   // soft ends, so the loop point is silent
-    const s=ctx.createBufferSource();s.buffer=n;s.loop=true;const f=ctx.createBiquadFilter();f.type="lowpass";f.frequency.value=150;f.Q.value=.5;
-    uwG=ctx.createGain();uwG.gain.value=0;s.connect(f);f.connect(uwG);uwG.connect(master);s.start();uwG.src=s;uwG.v=0;}
-  if(Math.abs(uwG.v-v)>.01){uwG.v=v;fadeTo(uwG,v,1.2);}}
+function iTitle(t){I_.classList.toggle("t1",t>=IT.title);I_.classList.toggle("t2",t>=IT.tag);
+  if(t>=IT.btn&&!I_.classList.contains("t3"))iBtnAt=performance.now();I_.classList.toggle("t3",t>=IT.btn);}
+// ---- sound: one scored track that follows the intro clock (a/v6 — made by sfx/synth_v6_intro.py) ----
+// The score has the pad and every designed sound baked in at the picture's timings, so "seek" is all we need when a scene is skipped.
+// Under the held last frame: a still drone of the final chord, and one soft breath in step with the button's glow.
+let scN=null,scG=null,scOff=0,scAt=0,hoN=null,hoG=null,brNext=0,iBtnAt=0;
+const scPos=()=>scOff+(ctx.currentTime-scAt);
+function scStop(sec){if(!scN)return;const n=scN,g=scG;scN=scG=null;fadeTo(g,0,sec);setTimeout(()=>{try{n.stop();}catch(e){}g.disconnect();},sec*1000+150);}
+function scPlay(t){
+  const b=bufs.intro_score;if(!b||t>=b.duration-.3)return;scStop(.12);
+  scG=ctx.createGain();scG.gain.value=0;scG.connect(master);scN=ctx.createBufferSource();scN.buffer=b;scN.connect(scG);
+  scOff=t;scAt=ctx.currentTime;scN.start(0,t+.026);fadeTo(scG,1,.15);}          // .026 s ≈ the mp3 decoder's lead-in
+function hoStop(sec){if(!hoN)return;const n=hoN,g=hoG;hoN=hoG=null;fadeTo(g,0,sec);setTimeout(()=>{try{n.stop();}catch(e){}g.disconnect();},sec*1000+150);}
 function iSound(t){
-  if(!ctx)return;setFilter(4);const w=iWant(t);
-  for(const n of IBEDS)setLoop(n,w[n]||0,1.2);uw(w.uw||0);}
+  if(!ctx)return;                                                               // no sound until the first touch (iOS); the picture stands on its own
+  for(const n of["intro_score","intro_hold","intro_breath"])load(n).catch(()=>{});
+  const through=I_.classList.contains("through");
+  if(iSilent||iFroze!==null||through||t>21.7)scStop(.5);
+  else if(bufs.intro_score&&(!scN||Math.abs(scPos()-t)>.2))scPlay(t);           // start, or follow a jump of the clock
+  const held=I_.classList.contains("t3")&&!through&&iFroze===null;
+  if(!held){hoStop(.8);return;}
+  if(!bufs.intro_hold||!bufs.intro_breath)return;
+  const now=ctx.currentTime,btn=now-(performance.now()-iBtnAt)/1000;            // when the button (and its 4.2 s glow cycle) began, in audio time
+  if(!hoN){hoG=ctx.createGain();hoG.gain.value=0;hoG.connect(master);hoN=ctx.createBufferSource();hoN.buffer=bufs.intro_hold;hoN.loop=true;
+    hoN.loopStart=.076;hoN.loopEnd=8.076;hoN.connect(hoG);hoN.start(0,.076);fadeTo(hoG,1,2.5);brNext=btn+4.2*Math.ceil(Math.max(0,now-btn)/4.2);}
+  while(brNext<now+.5){if(brNext>=now){const b=ctx.createBufferSource();b.buffer=bufs.intro_breath;b.connect(hoG);b.start(brNext);}brNext+=4.2;}
+}
 // ---- clock ----
-function iSize(){const d=Math.min(devicePixelRatio||1,1.5);IW=innerWidth;IH=innerHeight;icv.width=IW*d;icv.height=IH*d;ix.setTransform(d,0,0,d,0,0);iPrep();
+function iSize(){const d=Math.min(devicePixelRatio||1,1.5);IW=innerWidth;IH=innerHeight;icv.width=IW*d;icv.height=IH*d;ix.setTransform(d,0,0,d,0,0);iPrep();if(iGL)iGL.resize();
   $("iGo").style.top=gapY()+"px";}
 function iShow(t){
-  if(!reduceMotion){iDraw(t);return;}
+  if(!reduceMotion){iPaint(t);return;}
   let r=0;for(let k=0;k<IREP.length;k++)if(t>=IREP[k][0])r=k;
   if(r===iRep)return;const first=iRep<0;iRep=r;
-  const paint=()=>{iDraw(IREP[r][1]);icv.style.opacity=1;};
-  if(first)paint();else{icv.style.opacity=0;setTimeout(paint,450);}}
+  const paint=()=>{iPaint(IREP[r][1]);iC.style.opacity=1;};
+  if(first)paint();else{iC.style.opacity=0;setTimeout(paint,450);}}
 function iFrame(now){
   const t=iNow();
+  if(iGL&&GLQ!=="force"&&iFroze===null&&!reduceMotion&&iPrev&&t<IT.hold){      // too slow for this GPU? first render smaller, then give up on WebGL
+    iDt+=now-iPrev;if(++iDtN>=45){const avg=iDt/iDtN;iDt=iDtN=0;if(avg>42&&!iGL.lower())glFallback();}}
+  iPrev=now;
   if(t<IT.hold+1.5||now-iLast>=33){iShow(t);iLast=now;}   // after the title settles, 30 fps is plenty
   iCaption(t);iTitle(t);if(now-iTick>200){iTick=now;iSound(t);}
   iRaf=iOn?requestAnimationFrame(iFrame):0;}
 function playIntro(o){
   iThen=o.then;iSilent=!!o.hold;introOn=true;iOn=true;iRep=-1;iCapI=-1;if(iCapEl){iCapEl.remove();iCapEl=null;}
   I_.classList.remove("through","t1","t2","t3","now");I_.classList.toggle("rm",reduceMotion);I_.classList.toggle("en",!ZH);
-  $("iTag").textContent=ZH?"每個念頭，都是一滴回到雲間的水":"Every thought is a drop returning to the clouds.";
+  $("iTag").textContent=ZH?"雲間月色，似曾相見":"Moonlight between the clouds, as if we had met before.";
+  fetch("a/v6/intro_score.mp3").catch(()=>{});                               // warm the cache; decoding waits for the first touch
   $("iGo").textContent=ZH?"走進寧靜":"Into the quiet";$("iSkip").textContent=ZH?"略過":"Skip";
-  icv.style.opacity=1;iSize();setT(o.hold?IT.hold:0);if(o.hold)I_.classList.add("now");
+  if(iGL===null){iGL=(GLQ!=="off"&&window.KumomaGL&&KumomaGL.create(igc,{force:GLQ==="force",starts:IT.start}))||false;}
+  iC=iGL?igc:icv;igc.style.display=iGL?"":"none";icv.style.display=iGL?"none":"";iDt=iDtN=iPrev=0;
+  iC.style.opacity=1;iSize();setT(o.hold?IT.hold:0);if(o.hold)I_.classList.add("now");
   showOv(I_);ta.blur();if(!iRaf)iRaf=requestAnimationFrame(iFrame);}
 function endIntro(){
   iOn=false;introOn=false;
-  if(uwG){const g=uwG;uwG=null;fadeTo(g,0,.8);setTimeout(()=>{try{g.src.stop();}catch(e){}g.disconnect();},1200);}
-  if(ctx)for(const n of IBEDS)setLoop(n,0,1);
+  if(ctx){scStop(.8);hoStop(.8);}
   setTimeout(syncAudio,50);}
 I_.addEventListener("click",e=>{                         // tap anywhere: on to the next moment
   if(e.target.closest("#iGo,#iSkip")||I_.classList.contains("through"))return;
   const t=iNow(),nx=IT.start.find(s=>s>t+.05);if(nx!==undefined)setT(nx);});
-$("iSkip").onclick=e=>{e.stopPropagation();iSilent=true;if(ctx){for(const n of IBEDS)setLoop(n,0,.6);uw(0);}
+$("iSkip").onclick=e=>{e.stopPropagation();iSilent=true;if(ctx)scStop(.6);                 // the score stops; only the button's quiet breath remains
   setT(Math.max(iNow(),IT.hold));I_.classList.add("now");};
 $("iGo").onclick=e=>{
   e.stopPropagation();unlock();saveTone(.8);iSilent=true;
@@ -943,7 +961,7 @@ $("iGo").onclick=e=>{
   if(iThen==="onb")setTimeout(startOnb,800);
   setTimeout(()=>{hideOv(I_,700);setTimeout(endIntro,750);},1300);};
 addEventListener("resize",()=>{if(iOn)iSize();});
-window.__intro={get on(){return iOn},get t(){return Math.round(iNow()*100)/100},get scene(){return sceneOf(iNow())+1},get caption(){return iCapEl?iCapEl.textContent:""}};
+window.__intro={get on(){return iOn},get t(){return Math.round(iNow()*100)/100},get scene(){return sceneOf(iNow())+1},get caption(){return iCapEl?iCapEl.textContent:""},get gl(){return !!iGL},get sound(){return{score:!!scN,pos:scN?Math.round(scPos()*10)/10:null,hold:!!hoN,ctx:!!ctx}},get glSize(){return iGL?iGL.size:null},freeze(t){iFroze=t;iRep=-1;},unfreeze(){if(iFroze!==null){setT(iFroze);iFroze=null;}}};
 $("reWelcome").onclick=()=>{close();setTimeout(()=>playIntro({hold:true,then:"onb"}),350);};
 $("reIntro").onclick=()=>{close();setTimeout(()=>playIntro({hold:false,then:st.onboarded?"home":"onb"}),350);};
 // the intro plays by itself once, on the very first open; until onboarding is done we come back to its last frame
